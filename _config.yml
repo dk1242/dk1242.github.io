@@ -11,6 +11,8 @@ github_username: dk1242
 
 # Build settings
 theme: minima
+sass:
+  style: compressed
 plugins:
   - jekyll-feed
 # Exclude from processing.
