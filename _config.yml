@@ -5,7 +5,7 @@ description: >-
   Follow for more interesting blogs on C++, OpenGL and system programming
   and many more.
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "" # the base hostname & protocol for your site, e.g. http://example.com
+url: "https://dk1242.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: dhruval99kush
 github_username: dk1242
 
