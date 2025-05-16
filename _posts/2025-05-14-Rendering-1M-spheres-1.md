@@ -40,4 +40,64 @@ We'll also need one more library **GLAD**, it helps in locating the openGL funct
 It is a system specific process and it's setup process you can find [here on learnopengl.com](https://learnopengl.com/Getting-started/Creating-a-window#:~:text=to%2Ddate%20library.-,Setting%20up%20GLAD,-GLAD%20is%20an).
 
 ## Creating a window
-Create main.cpp file in you project.
+Let's create main.cpp file in you project, include glfw and glad and create main() function. We'll initialize glfw with glfwInit() and we'll have to configure it like setting up the openGL version (3.3) and openGL profile type(CORE). 
+```
+int main()
+{
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  
+    return 0;
+}
+```
+You can follow [this page](https://learnopengl.com/Getting-started/Hello-Window) for detailed description of the things I'm writing here. As the intented topic for this article is different, so I have to keep things short and precise.
+
+After setting up glfw, we will create GLFWwindow object by passing the window's width, height and title. We also have to make this window context current on the calling thread.
+Before that we'll create 2 global const variable for width and height.
+```
+const int WIDTH = 1920, HEIGHT = 1080;
+```
+```
+GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "1M spheres", NULL, NULL);
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    glfwMakeContextCurrent(window);
+```
+Then we need to initialize *glad* in our application by calling 
+```
+if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        return -1;
+    }
+```
+Before we start rendering, we need to set the viewport dimensions for openGL using **glViewport(x1, y1, x2, y2)** where (x1, y1) is the location of lower left corner point and (x2, y2) is upper right corner point.
+If you want you can setup a callback, which will resize your viewport when you will resize the window.
+
+We dont want our application to just render something and exit. We need it to be running until we close it. For that we will some event loop kinda thing and what's better than a infinite while loop. 
+So, we'll create a while loop with condition (!glfwWindowShouldClose(window)) which will check if it's been instructed fot closing the window.
+```
+while(!glfwWindowShouldClose(window))
+{
+    glfwSwapBuffers(window);
+    glfwPollEvents();    
+}
+```
+* glfwSwapBuffers(window) - It will swap the color buffer (which is a 2d buffer consisting of color values for each pixel in this window, which combiningly makes a frame). Usually there are 2 buffers, we call them front and back buffer. The front buffer is what we see as output image while in back buffer, all the rendering commands draws it. As soon as the back buffer is ready, we swap the back buffer to front buffer and new frame drawing starts to the back buffer.
+* glfwPollEvents() - It will listen if any event is triggered and call the corresponding functions.
+
+After exiting the loop, we'll need to call **glfwTerminate()**, which will cleanup the resources. 
+
+Upto this point, you should be able to create a blank black color window.
+
+> If you want you can add a keypress event which will close the application by pressing ESC button. Just add the below line at the top of your while loop.
+```
+if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
+```
+
