@@ -107,3 +107,26 @@ glClearColor(0.2f, 0.3f, 0.3f, 1.0f); // fills this rgba on screen
 glClear(GL_COLOR_BUFFER_BIT); // clears the screen color's buffer and then entire color buffer will be filled again with the same color configured by glClearColor.
 ```
 ## Triangles
+As we know, in 2D space, the basic things we can draw include points, lines, triangles, rectangles or generally polygons. But the smallest closed shape in which you can fill some color is a triangle. 
+
+That’s why, in OpenGL, every object we draw is ultimately made up of triangles. Whether it's a simple 2D shape or a complex 3D model from a high-end video game or animated movie, it's all just triangles. These triangles when connected in a structered way will form a mesh of that object, which you can imagine as its skeleton. Later we can add colors, textures, lighting, and more to it.
+
+In OpenGL, when everything exists in 3D space but our screen is just 2D, then we need to transform these 3D coordinates into 2D pixel and this whole process is handled by the graphics pipeline. It can be divided into 2 main steps: 
+
+1. Transform 3D coordinates into 2D screen coordinates.
+2. Transform these 2D coordinates into colored pixels.
+
+As input to this graphics pipeline, we need to pass a list of 3d coordinates that can form a triangle. The minimum we need to pass is the position of these vertices in 3D space (i.e. `x`, `y`, `z`). But we can also pass other attributes too like Normals, Color, texture Coordinates which will make it a vertex.
+
+### Pipeline stages
+
+1. The first stage of this graphics pipeline is vertex shader which takes a single vertex as input. Here, we can apply whatever modifications we want on that particular vertex like shifting it's position based on some polynomial equation. 
+2. Then it's passed to geometry shader which take a collection of vertices and has ability to generate some new geometry by emitting new vertices.
+3. Then there is shape assembly stage which will take previous stage output as input and will assemble all those vertices into a shape.
+4. This output will be passed to resterization stage where it maps the resulting shape to the corresponding pixel on the screen, resulting in the fragments for fragment shader. Clipping also happens before next step to remove the fragments which are outside our view.
+5. Now fragment shader will run and calculate the final color of a pixel.
+6. Last stage is alpha test and blending stage where we check if this particular fragment is getting behind any other or not, basically a depth test. It will also blend according to alpha values if blending is enabled.
+
+Even though it feels like a lot but we only have to deal majorly with vertex and fragment shader only unless you need some advanced behavior.
+
+### Drawing our first triangle
