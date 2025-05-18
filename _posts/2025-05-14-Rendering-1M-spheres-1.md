@@ -31,7 +31,7 @@ For OpenGL, we are not going to use the OpenGL functions directly as they are wr
 You can build GLFW package using CMake GUI or CLI as described on learnopengl.com's [*Building GLFW* section](https://learnopengl.com/Getting-started/Creating-a-window#:~:text=most%20other%20IDEs.-,Building%20GLFW,-GLFW%20can%20be) or directly use 
 a pre-compiled package for your system. We'll also have to link this library with our compilation process. For Visual Studio setup, you can follow [this section from learnopengl.com](https://learnopengl.com/Getting-started/Creating-a-window#:~:text=first%20OpenGL%20application!-,Linking,-In%20order%20for).
 ```
-If you ever want to compile your c++ code with external libraries, you can link them by adding -l<libraryname> during compilation.
+If you ever want to compile your C++ code with external libraries, you can link them by adding -l<libraryname> during compilation.
 
 eg. 
 g++ -o main main.cpp -lglfw3 -lGL 
@@ -40,7 +40,7 @@ We'll also need one more library: **GLAD**, it helps in loading the actual openG
 
 ## Creating a window
 Let’s start by creating main.cpp file. Inside it, we'll include both GLFW and GLAD, and define main() function. We'll initialize glfw with glfwInit(). Then we'll have to configure it by specifying the openGL version (3.3) and setting openGL profile type(CORE). 
-```c++
+```C++
 int main()
 {
     glfwInit();
@@ -55,10 +55,10 @@ You can follow [this page](https://learnopengl.com/Getting-started/Hello-Window)
 
 After setting up glfw, we will create GLFWwindow* object by passing the window's width, height and title. We'll also have to make this window's context current on the calling thread using glfwMakeContextCurrent().
 Before that we'll create 2 global const variable for width and height.
-```c++
+```C++
 const int WIDTH = 1920, HEIGHT = 1080;
 ```
-```c++
+```C++
 GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "1M spheres", NULL, NULL);
 if (window == NULL)
 {
@@ -69,7 +69,7 @@ if (window == NULL)
 glfwMakeContextCurrent(window);
 ```
 Then we need to initialize **GLAD** in our application by calling 
-```c++
+```C++
 if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 {
     std::cout << "Failed to initialize GLAD" << std::endl;
@@ -82,7 +82,7 @@ If you want you can also setup a callback, which will resize your viewport whene
 
 Next, we don't want our application to just render something and exit. We want it to keep running until we close it. For that we can use some event loop kinda thing and what's better than a infinite while loop? 
 So, we'll create a while loop with condition (!glfwWindowShouldClose(window)) which will check if it's been instructed for closing the window.
-```c++
+```C++
 while(!glfwWindowShouldClose(window))
 {
     glfwSwapBuffers(window);
@@ -97,12 +97,12 @@ After exiting the loop, we'll call **glfwTerminate()**, which will cleanup the r
 Upto this point, you should be able to launch a window - a blank one with black background.
 
 > If you want you can also add a keypress event to close the application by pressing ESC button. Just add the below line at the top of your while loop.
-```c++
+```C++
 if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
 ```
 
 For the sake of doing it, let's clear our screen with a specific color. 
-```c++
+```C++
 glClearColor(0.2f, 0.3f, 0.3f, 1.0f); // fills this rgba on screen
 glClear(GL_COLOR_BUFFER_BIT); // clears the screen color's buffer and then entire color buffer will be filled again with the same color configured by glClearColor.
 ```
@@ -133,20 +133,20 @@ Even though it feels like a lot but we only have to deal majorly with vertex and
 As we said, to start we need to provide the basic input and that is 3 vertices which will define a triangle. But we need these coordinates as Normalized Device Coordinates (NDC) i.e. in between -1.0 to 1.0, because OpenGL can only transform these to 2D pixels on our screen.
 
 To understand NDC, consider our screen's lower left corner is (-1, -1) and upper right corner is (1, 1). So, we need to pass the vertices points accordingly.
-```c++
+```C++
 float vertices[] = {
     -0.5f, -0.5f, 0.0f,
     0.5f, -0.5f, 0.0f,
     0.0f, 0.5f, 0.0f,
 };
 ```
-![Triangle](triangle.png)
+![Triangle](/assets/images/triangle.png)
 Here, `z` coordinate is 0.0 because we are not passing any depth for now, to make it look like 2D.
 
 Now, we need to pass this vertex data to our first stage of graphics pipeline which is vertex shader. For that, we need to create a memory buffer on the GPU which is named as Virtual Buffer Object (VBO). It can store a large number of vertices in its GPU memory, which gives us the advantage of sending large batches at once not one at a time. Since this data transfer between CPU and GPU is relatively slow, we'll try to pass as much data as possible at once. Once it's in GPU memory, it will be instantly accesible which makes it extremely fast. **Remember this point, we'll take its advantage during our optimization phase for 1 Million spheres.**
 
 We can generate any buffer using glGenBuffers() and bind them to respective buffer type which is `GL_ARRAY_BUFFER` in this case using glBindBuffer().
-```c++
+```C++
 GLuint VBO;
 glGenBuffers(1, &VBO);
 glBindBuffer(GL_ARRAY_BUFFER, VBO);    
@@ -154,14 +154,14 @@ glBindBuffer(GL_ARRAY_BUFFER, VBO);
 From this point, every buffer calls we make on `GL_ARRAY_BUFFER` target will point to currently binded buffer which is VBO. 
 
 Now we'll call glBufferData() to copy previously defined data of vertices into the currently bounded buffer's memory. The first argument we pass is the buffer type which is bounded to VBO. The second argument is the total size of data (in bytes) we are passing. The third parameter is the actual data we pass and the last parameter just defines how we want GPU to manage the provided data. Here, GL_STATIC_DRAW defines that this data will be set once and will be used many times.
-```c++
+```C++
 glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 ```
 Now we have our data inside the GPU memory, we will create vertex and fragment shader to process it. 
 
 ### Vertex Shader
 Shaders can be written in GLSL (OpenGL Shading Language) and HLSL (HighLevel Shading Language). We will use GLSL for now. Here is the very basic vertex shader code which we will use for our program for now.
-```glsl
+```GLSL
 #version 330 core // declares the version
 layout (location = 0) in vec3 aPos; // declaring input vertex attribute 
 
@@ -174,7 +174,7 @@ void main() // declaring main function (same as C)
 >Perspective division tells us that how much objects size will decrease with increase in distance as it happens with humans perspective. Here, we are setting it to 1.0 as its 2D.
 
 For this simple program of just drawing a triangle, we will declare this vertex shader code in our main.cpp file only.
-```c++
+```C++
 const char* vertexShaderSource = "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
     "void main()\n"
@@ -183,13 +183,13 @@ const char* vertexShaderSource = "#version 330 core\n"
     "}\0";
 ```
 For OpenGL to use this shader, it has to be dynamically compiled at run time. So we will create a shader object, attach the shader source code with this object and then compile it.
-```glsl
+```C++
 GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 glShaderSource(vertexShader, 1, &vertexShaderSource, NULL); // 2nd argument here is the number of strings we are passing as source code
 glCompileShader(vertexShader);
 ```
 > If you want, you can add a compilation check if its successful or not using glGetShaderiv().
-```c++
+```C++
 GLint hasCompiled;
 char infoLog[1024]; // to store the error msg
 glGetShaderiv(shader, GL_COMPILE_STATUS, &hasCompiled);
@@ -201,7 +201,7 @@ if (hasCompiled == GL_FALSE)
 ```
 ### Fragment Shader
 We will follow the same steps as vertex shader like first define the fragment shader scource, then create an object for fragment shader and then compile it. But before that here is our fragment shader code in GLSL with commented details.
-```glsl
+```GLSL
 #version 330 core // declares the version
 out vec4 FragColor; // declaring output fragment color 
 
@@ -226,7 +226,7 @@ glCompileShader(fragmentShader);
 Now that both shaders are compiled then we have to link both shader objects into a shader program.
 ### Shader Program
 A shader program object is the final linked version of all shaders combined (for now vertex and fragment shader only). We will kinda similar approach here too- first create a shader program object, attach both shaders and link them using glLinkProgram(). Now, we can use this shader program anywhere using glUseProgram(). 
-```c++
+```C++
 GLuint shaderProgram;
 shaderProgram = glCreateProgram();
 glAttachShader(shaderProgram, vertexShader); // output of this shader is input for next shader
@@ -236,7 +236,7 @@ glLinkProgram(shaderProgram);
 glUseProgram(shaderProgram);
 ```
 After linking both shaders to shaderProgram we can delete vertexShader and fragmentShader objects.
-```c++
+```C++
 glDeleteShader(vertexShader);
 glDeleteShader(fragmentShader);  
 ```
@@ -249,7 +249,7 @@ Our `Vertices[]` array consists of 9 float variables but one vertex is defined b
 * for third vertex, start reading from 24th byte for 12 bytes.
 
 So, I hope you understands how this reading will take place when we will pass color, normals etc with this data. We can tell all this to OpenGL using glVertexAttribPointer().
-```c++
+```C++
 glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 glEnableVertexAttribArray(0); // enables the vertex attribute of index 0
 ```
