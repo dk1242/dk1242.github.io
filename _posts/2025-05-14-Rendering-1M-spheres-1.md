@@ -109,30 +109,30 @@ glClear(GL_COLOR_BUFFER_BIT); // clears the screen color's buffer and then entir
 ## Triangles
 As we know, in 2D space, the basic things we can draw include points, lines, triangles, rectangles or generally polygons. But the smallest closed shape in which you can fill some color is a triangle. 
 
-That’s why, in OpenGL, every object we draw is ultimately made up of triangles. Whether it's a simple 2D shape or a complex 3D model from a high-end video game or animated movie, it's all just triangles. These triangles when connected in a structered way will form a mesh of that object, which you can imagine as its skeleton. Later we can add colors, textures, lighting, and more to it.
+That’s why, in OpenGL, every object we draw is ultimately made up of triangles. Whether it's a simple 2D shape or a complex 3D model from a high-end video game or animated movie, it's all just triangles. These triangles when connected in a structured way will form a mesh of that object, which you can imagine as its skeleton. Later we can add colors, textures, lighting, and more to it.
 
-In OpenGL, when everything exists in 3D space but our screen is just 2D, then we need to transform these 3D coordinates into 2D pixel and this whole process is handled by the graphics pipeline. It can be divided into 2 main steps: 
+In OpenGL, when everything exists in 3D space but our screen is just 2D, then we need to transform these 3D coordinates into 2D pixels and this whole process is handled by the graphics pipeline. It can be divided into 2 main steps: 
 
 1. Transform 3D coordinates into 2D screen coordinates.
 2. Transform these 2D coordinates into colored pixels.
 
-As input to this graphics pipeline, we need to pass a list of 3d coordinates that can form a triangle. The minimum we need to pass is the position of these vertices in 3D space (i.e. `x`, `y`, `z`). But we can also pass other attributes too like Normals, Color, texture Coordinates which will make it a vertex.
+As input to this graphics pipeline, we need to pass a list of 3D coordinates that can form a triangle. The minimum we need to pass is the position of these vertices in 3D space (i.e. `x`, `y`, `z`). But we can also pass other attributes too like normals, color, texture Coordinates which will make it a vertex.
 
 ### Pipeline stages
 
-1. The first stage of this graphics pipeline is vertex shader which takes a single vertex as input. Here, we can apply whatever modifications we want on that particular vertex like shifting it's position based on some polynomial equation. 
-2. Then it's passed to geometry shader which take a collection of vertices and has ability to generate some new geometry by emitting new vertices.
+1. The first stage of this graphics pipeline is vertex shader which takes a single vertex as input. Here, we can apply whatever modifications we want on that particular vertex like shifting its position based on some polynomial equation. 
+2. Then it's passed to geometry shader which takes a collection of vertices and has ability to generate some new geometry by emitting new vertices.
 3. Then there is shape assembly stage which will take previous stage output as input and will assemble all those vertices into a shape.
-4. This output will be passed to resterization stage where it maps the resulting shape to the corresponding pixel on the screen, resulting in the fragments for fragment shader. Clipping also happens before next step to remove the fragments which are outside our view.
+4. This output will be passed to rasterization stage where it maps the resulting shape to the corresponding pixel on the screen, resulting in the fragments for the fragment shader. Clipping also happens before next step to remove the fragments which are outside our view.
 5. Now fragment shader will run and calculate the final color of a pixel.
-6. Last stage is alpha test and blending stage where we check if this particular fragment is getting behind any other or not, basically a depth test. It will also blend according to alpha values if blending is enabled.
+6. Last stage is alpha testing and blending stage where we check if this particular fragment is behind any other fragment or not, basically a depth test. It will also blend according to alpha values if blending is enabled.
 
-Even though it feels like a lot but we only have to deal majorly with vertex and fragment shader only unless you need some advanced behavior.
+Even though it feels like a lot, but we only have to deal majorly with vertex and fragment shader only unless you need some advanced behavior.
 
 ### Drawing our first triangle
 As we said, to start we need to provide the basic input and that is 3 vertices which will define a triangle. But we need these coordinates as Normalized Device Coordinates (NDC) i.e. in between -1.0 to 1.0, because OpenGL can only transform these to 2D pixels on our screen.
 
-To understand NDC, consider our screen's lower left corner is (-1, -1) and upper right corner is (1, 1). So, we need to pass the vertices points accordingly.
+To understand NDC, consider our screen's lower left corner is (-1, -1) and upper right corner is (1, 1). So, we need to pass the vertex points accordingly.
 ```cpp
 float vertices[] = {
     -0.5f, -0.5f, 0.0f,
@@ -141,9 +141,9 @@ float vertices[] = {
 };
 ```
 ![Triangle](/assets/images/triangle.png)
-Here, `z` coordinate is 0.0 because we are not passing any depth for now, to make it look like 2D.
+Here, z-coordinate is 0.0 because we are not passing any depth for now, to make it appear 2D.
 
-Now, we need to pass this vertex data to our first stage of graphics pipeline which is vertex shader. For that, we need to create a memory buffer on the GPU which is named as Virtual Buffer Object (VBO). It can store a large number of vertices in its GPU memory, which gives us the advantage of sending large batches at once not one at a time. Since this data transfer between CPU and GPU is relatively slow, we'll try to pass as much data as possible at once. Once it's in GPU memory, it will be instantly accesible which makes it extremely fast. **Remember this point, we'll take its advantage during our optimization phase for 1 Million spheres.**
+Now, we need to pass this vertex data to our first stage of graphics pipeline which is vertex shader. For that, we need to create a memory buffer on the GPU which is named as Vertex Buffer Object (VBO). It can store a large number of vertices in its GPU memory, which gives us the advantage of sending large batches at once rather than one at a time. Since this data transfer between CPU and GPU is relatively slow, we'll try to pass as much data as possible at once. Once it's in GPU memory, it will be instantly accessible which makes it extremely fast. **Remember this point, we'll take advantage of this during our optimization phase for 1 Million spheres.**
 
 We can generate any buffer using glGenBuffers() and bind them to respective buffer type which is `GL_ARRAY_BUFFER` in this case using glBindBuffer().
 ```cpp
@@ -151,16 +151,16 @@ GLuint VBO;
 glGenBuffers(1, &VBO);
 glBindBuffer(GL_ARRAY_BUFFER, VBO);    
 ```
-From this point, every buffer calls we make on `GL_ARRAY_BUFFER` target will point to currently binded buffer which is VBO. 
+From this point, every buffer calls we make to the `GL_ARRAY_BUFFER` target will point to currently bound buffer which is VBO. 
 
-Now we'll call glBufferData() to copy previously defined data of vertices into the currently bounded buffer's memory. The first argument we pass is the buffer type which is bounded to VBO. The second argument is the total size of data (in bytes) we are passing. The third parameter is the actual data we pass and the last parameter just defines how we want GPU to manage the provided data. Here, GL_STATIC_DRAW defines that this data will be set once and will be used many times.
+Now we'll call glBufferData() to copy previously defined data of vertices into the currently bound buffer's memory. The first argument we pass is the buffer type currently bound to the VBO. The second argument is the total size of data (in bytes) we are passing. The third parameter is the actual data we pass and the last parameter just defines how we want GPU to manage the provided data. Here, GL_STATIC_DRAW defines that this data will get set once and used many times.
 ```cpp
 glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 ```
 Now we have our data inside the GPU memory, we will create vertex and fragment shader to process it. 
 
 ### Vertex Shader
-Shaders can be written in GLSL (OpenGL Shading Language) and HLSL (HighLevel Shading Language). We will use GLSL for now. Here is the very basic vertex shader code which we will use for our program for now.
+Shaders can be written in GLSL (OpenGL Shading Language) and HLSL (High-Level Shading Language). For now, we will use GLSL. Here is a very basic vertex shader code that we will use for our program.
 ```GLSL
 #version 330 core // declares the version
 layout (location = 0) in vec3 aPos; // declaring input vertex attribute 
@@ -168,12 +168,12 @@ layout (location = 0) in vec3 aPos; // declaring input vertex attribute
 void main() // declaring main function (same as C)
 {
     gl_Position = vec4(aPos, 1.0); // setting gl_Position (the input for next stage) with aPos values 
-                //last parameter is w, which tells the perspective division
+                //last parameter is w, which controls perspective division
 }
 ```
->Perspective division tells us that how much objects size will decrease with increase in distance as it happens with humans perspective. Here, we are setting it to 1.0 as its 2D.
+>Perspective division tells us how an object's size decreases with increase in distance,  similar to human's perception. Here, we are setting it to 1.0 as it's just 2D now.
 
-For this simple program of just drawing a triangle, we will declare this vertex shader code in our main.cpp file only.
+For this simple program of just drawing a triangle, we will declare the vertex shader code in our main.cpp file only.
 ```cpp
 const char* vertexShaderSource = "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
@@ -201,7 +201,7 @@ if (hasCompiled == GL_FALSE)
 ```
 
 ### Fragment Shader
-We will follow the same steps as vertex shader like first define the fragment shader scource, then create an object for fragment shader and then compile it. But before that here is our fragment shader code in GLSL with commented details.
+We will follow the same steps as for the vertex shader like first define the fragment shader source, then create an object for fragment shader and then compile it. But before that here is our fragment shader code in GLSL with commented details.
 ```GLSL
 // GLSL code
 #version 330 core // declares the version
@@ -225,9 +225,9 @@ fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
 glCompileShader(fragmentShader);
 ```
-Now that both shaders are compiled then we have to link both shader objects into a shader program.
+Now that both shaders are compiled, we have to link both shader objects into a shader program.
 ### Shader Program
-A shader program object is the final linked version of all shaders combined (for now vertex and fragment shader only). We will kinda similar approach here too- first create a shader program object, attach both shaders and link them using glLinkProgram(). Now, we can use this shader program anywhere using glUseProgram(). 
+A shader program object is the final linked version of all shaders combined (for now vertex and fragment shader only). We will follow a similar approach here too- first create a shader program object, attach both shaders and link them using glLinkProgram(). We can now activate this shader program using glUseProgram(). 
 ```cpp
 GLuint shaderProgram;
 shaderProgram = glCreateProgram();
@@ -237,12 +237,12 @@ glLinkProgram(shaderProgram);
 
 glUseProgram(shaderProgram);
 ```
-After linking both shaders to shaderProgram we can delete vertexShader and fragmentShader objects.
+After linking both shaders to shaderProgram we can delete both vertexShader and fragmentShader objects.
 ```cpp
 glDeleteShader(vertexShader);
 glDeleteShader(fragmentShader);  
 ```
-So, GPU have our data, it knows what to do with it but it don't know how to interpret it.
+So, the GPU have our data, it knows what to do with it but it doesn't know how to interpret it.
 
 ### Linking Vertex Attributes
 Our `Vertices[]` array consists of 9 float variables but one vertex is defined by 3 float variables determining its position. Now we need to tell GPU that:
@@ -250,30 +250,30 @@ Our `Vertices[]` array consists of 9 float variables but one vertex is defined b
 * for second vertex, read from (0 + 12)th byte to 12 + 12 = 24th byte.
 * for third vertex, start reading from 24th byte for 12 bytes.
 
-So, I hope you understands how this reading will take place when we will pass color, normals etc with this data. We can tell all this to OpenGL using glVertexAttribPointer().
+So, I hope you understand how this reading will take place when we will pass color, normals etc with this data. We can tell all this to OpenGL using glVertexAttribPointer().
 ```cpp
 glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 glEnableVertexAttribArray(0); // enables the vertex attribute of index 0
 ```
 So, for glVertexAttribPointer the passed arguments defines following:
-1. First argument determines which vertex attribute we want to define. Here, it's `aPos` with `layout (location = 0)` which sets the location of this vertex attribute to 0 and we can pass data to this attrubute using 0.
-2. Second argument defines its size. As, aPos is vec3 it will take 3 values.
-3. type of data
-4. if we want our data to be normalized which is not relevant now
-5. It defines stride means after how much byte the next value of current attribute starts, which is 3 here (pos- x, y, z).
-6. It is offset which you can set if we are passing multiple properties at a time. Currently its aPos only so it's (void*)0.
+1. First argument determines which vertex attribute we want to define. Here, it's `aPos` with `layout (location = 0)` which sets the location of this vertex attribute to 0 and we can pass data to this attribute using 0.
+2. Second argument defines its size. Since, aPos is a vec3, it will take 3 values.
+3. Third argument specifies the data type
+4. Fourth argument specifies whether the data should be normalized (not needed here)
+5. The fifth argument defines stride that means after how much byte the next value of current attribute starts, which is 3 here (pos- x, y, z).
+6. The sixth argument is the offset which you can set if we are passing multiple properties at a time. Currently its aPos only so it's (void*)0.
 
 ### Vertex Array Object
-We will need to create one more object which will keep all the states we need to supply vertex data which is our VBO. So when drawing multiple objects, we dont need to configure VBO every single time before drawing. Just configure them once and bind it to VAO, then just bind this VAO before drawing which is just one function.
+We will need to create one more object which will keep all the states we need to supply vertex data which is our VBO. So when drawing multiple objects, we don't need to configure VBO every single time before drawing. Just configure them once and bind them to a VAO, then just bind this VAO before drawing which requires just one function call.
 
 We can generate a VAO using glGenVertexArrays().
 ```cpp
 unsigned int VAO;
 glGenVertexArrays(1, &VAO);  
 ```
-Then we'll bind this vertex array object and configure our VBO and then again we can unbind our VBO and VAO. Now when we want to draw anything, just before that again bind this VAO. **That's all we need to remember as a constant flow.**
+Then we'll bind this vertex array object, and configure our VBO, and finally we can unbind our VBO and VAO. Now when we want to draw anything, just before that again bind this VAO. **That's all we need to remember as a constant flow.**
 
-So, that's all the setup we need and we are ready to draw our triangle. Inside our infinite while loop, call for using shaderProgram, bind the VAO and call `glDrawArrays(GL_TRIANGLES, 0, 3)` to draw triangle. The first argument for glDrawArrays is just tells what to draw other options are `GL_POINTS` and `GL_LINES`. The second argument tells the starting index of vertex array and last argument is the number of vertices we want to draw.
+So, that's all the setup we need and we are ready to draw our triangle. Inside our infinite while loop, activate the shaderProgram, bind the VAO and call `glDrawArrays(GL_TRIANGLES, 0, 3)` to draw triangle. The first argument to glDrawArrays specifies what to draw other options are `GL_POINTS` and `GL_LINES`. The second argument tells the starting index of vertex array and last argument specifies the number of vertices to draw.
 ```cpp
 glUseProgram(shaderProgram);
 glBindVertexArray(VAO);
@@ -282,9 +282,9 @@ glDrawArrays(GL_TRIANGLES, 0, 3);
 So, output of all this is the same image but without my coordinates marking.![Triangle](/assets/images/triangle.png)
 
 ### Element Buffer Objects
-Lets suppose we want to draw multiple triangles and they are connected as such most of these triangles are sharing the common vertices. Then its not a good idea to define vertices of all these triangles one by one. It's better to define the all vertices present in polygon and then define the traingle vertices using their index sequence. 
+Let's suppose we want to draw multiple triangles and they are connected as such most of these triangles share common vertices. Then it's not a good idea to define vertices of all these triangles one by one. It's better to define all the vertices of the polygon and then define the traingle vertices using their index sequence. 
 
-I'll explain this by drawing a rectangle. So, if we draw by VBO method we'll need to define 6 vertices (3 for both triangles) like this
+I'll explain this by drawing a rectangle. So, if we use the VBO method we need to define 6 vertices (3 for each triangle) like this
 ```cpp
 float vertices[] = {
     0.5f,  0.5f, 0.0f,
@@ -299,7 +299,7 @@ float vertices[] = {
 // and use 6 vertices for glDrawArrays
 glDrawArrays(GL_TRIANGLES, 0, 6);
 ```
-But with EBO, we just need to declare all our unique traingle vertices and then create another array which will determine the sequence of those vertices to form a triangle. 
+But with EBO, we just need to declare all our unique triangle vertices and then create another array which will determine the sequence of those vertices to form a triangle. 
 ```cpp
 float vertices[] = {
     0.5f,  0.5f, 0.0f,
@@ -312,7 +312,7 @@ unsigned int indices[] = {
     1, 2, 3    // second triangle
 };
 ```
-Then we will declare EBO after binding the VAO. So, it will hold the EBO's data. Then call glDrawElements() instead of glDrawArrays();
+Then we declare the EBO after binding the VAO, so the VAO will store the EBO’s state. We then call glDrawElements() instead of glDrawArrays();
 ```cpp
 GLuint EBO;
 glGenBuffers(1, &EBO);
@@ -331,4 +331,6 @@ while(true){
 Our output looks like this now.
 ![Rectangle](/assets/images/rectangle.png)
 
-So, We have covered a lot till this point which gives us the fundamental knowledge for rendering a single and later 1 Million spheres. In the next post, I'll try to cover everything we need to understand 3D in OpenGL.
+So, we have covered a lot up to this point, providing fundamental knowledge for rendering a single sphere and, later, 1 million spheres. 
+
+In the next post, I'll try to cover everything we need to understand 3D in OpenGL.
