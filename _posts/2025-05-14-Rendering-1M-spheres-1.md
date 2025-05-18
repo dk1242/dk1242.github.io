@@ -199,9 +199,11 @@ if (hasCompiled == GL_FALSE)
     std::cout << "SHADER_COMPILATION_ERROR:\n" << infoLog << std::endl;
 }
 ```
+
 ### Fragment Shader
 We will follow the same steps as vertex shader like first define the fragment shader scource, then create an object for fragment shader and then compile it. But before that here is our fragment shader code in GLSL with commented details.
 ```GLSL
+// GLSL code
 #version 330 core // declares the version
 out vec4 FragColor; // declaring output fragment color 
 
