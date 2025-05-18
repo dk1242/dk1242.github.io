@@ -16,5 +16,5 @@ sass:
 plugins:
   - jekyll-feed
 
-markdown: kramdown
+# markdown: kramdown
 highlighter: rouge
