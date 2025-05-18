@@ -24,14 +24,14 @@ I used Visual Studio 2022 on Windows 11, with an NVIDIA RTX A1000 Laptop GPU and
 With this GPU, we can render approximately 1.5-4 million visible vertices/frame even with complex calculations like Physically Based Rendering (PBR) and Image-Based Lighting (IBL), whilw maintaining 60 fps on screen. 
 You just check your configurations and the limits of your GPU.
 
-I assume that you have a decent understanding of cpp and Object Oriented Programming concepts, since once we cover the basics, we'll refactor our code to follow OOP principles.
+I assume that you have a decent understanding of C++ and Object Oriented Programming concepts, since once we cover the basics, we'll refactor our code to follow OOP principles.
 
 For OpenGL, we are not going to use the OpenGL functions directly as they are written by the GPU providers. Instead we will use GLFW, a library written in C, which provides all basic necessities for rendering and to create OpenGL context and handling windowing and input.
 
 You can build GLFW package using CMake GUI or CLI as described on learnopengl.com's [*Building GLFW* section](https://learnopengl.com/Getting-started/Creating-a-window#:~:text=most%20other%20IDEs.-,Building%20GLFW,-GLFW%20can%20be) or directly use 
 a pre-compiled package for your system. We'll also have to link this library with our compilation process. For Visual Studio setup, you can follow [this section from learnopengl.com](https://learnopengl.com/Getting-started/Creating-a-window#:~:text=first%20OpenGL%20application!-,Linking,-In%20order%20for).
 ```
-If you ever want to compile your cpp code with external libraries, you can link them by adding -l<libraryname> during compilation.
+If you ever want to compile your C++ code with external libraries, you can link them by adding -l<libraryname> during compilation.
 
 eg. 
 g++ -o main main.cpp -lglfw3 -lGL 
