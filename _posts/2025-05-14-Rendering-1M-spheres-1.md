@@ -262,3 +262,21 @@ So, for glVertexAttribPointer the passed arguments defines following:
 4. if we want our data to be normalized which is not relevant now
 5. It defines stride means after how much byte the next value of current attribute starts, which is 3 here (pos- x, y, z).
 6. It is offset which you can set if we are passing multiple properties at a time. Currently its aPos only so it's (void*)0.
+
+### Vertex Array Object
+We will need to create one more object which will keep all the states we need to supply vertex data which is our VBO. So when drawing multiple objects, we dont need to configure VBO every single time before drawing. Just configure them once and bind it to VAO, then just bind this VAO before drawing which is just one function.
+
+We can generate a VAO using glGenVertexArrays().
+```cpp
+unsigned int VAO;
+glGenVertexArrays(1, &VAO);  
+```
+Then we'll bind this vertex array object and configure our VBO and then again we can unbind our VBO and VAO. Now when we want to draw anything, just before that again bind this VAO. **That's all we need to remember as a constant flow.**
+
+So, that's all the setup we need and we are ready to draw our triangle. Inside our infinite while loop, call for using shaderProgram, bind the VAO and call `glDrawArrays(GL_TRIANGLES, 0, 3)` to draw triangle. The first argument for glDrawArrays is just tells what to draw other options are `GL_POINTS` and `GL_LINES`. The second argument tells the starting index of vertex array and last argument is the number of vertices we want to draw.
+```cpp
+glUseProgram(shaderProgram);
+glBindVertexArray(VAO);
+glDrawArrays(GL_TRIANGLES, 0, 3);
+```
+So, output of all this is the same image but without my coordinates marking.![Triangle](/assets/images/triangle.png)
