@@ -280,3 +280,55 @@ glBindVertexArray(VAO);
 glDrawArrays(GL_TRIANGLES, 0, 3);
 ```
 So, output of all this is the same image but without my coordinates marking.![Triangle](/assets/images/triangle.png)
+
+### Element Buffer Objects
+Lets suppose we want to draw multiple triangles and they are connected as such most of these triangles are sharing the common vertices. Then its not a good idea to define vertices of all these triangles one by one. It's better to define the all vertices present in polygon and then define the traingle vertices using their index sequence. 
+
+I'll explain this by drawing a rectangle. So, if we draw by VBO method we'll need to define 6 vertices (3 for both triangles) like this
+```cpp
+float vertices[] = {
+    0.5f,  0.5f, 0.0f,
+    0.5f, -0.5f, 0.0f,
+    -0.5f,  0.5f, 0.0f,
+
+    0.5f, -0.5f, 0.0f,
+    -0.5f, -0.5f, 0.0f,
+    -0.5f,  0.5f, 0.0f
+};
+
+// and use 6 vertices for glDrawArrays
+glDrawArrays(GL_TRIANGLES, 0, 6);
+```
+But with EBO, we just need to declare all our unique traingle vertices and then create another array which will determine the sequence of those vertices to form a triangle. 
+```cpp
+float vertices[] = {
+    0.5f,  0.5f, 0.0f,
+    0.5f, -0.5f, 0.0f,
+    -0.5f, -0.5f, 0.0f,
+    -0.5f,  0.5f, 0.0f
+};
+unsigned int indices[] = {
+    0, 1, 3,   // first triangle
+    1, 2, 3    // second triangle
+};
+```
+Then we will declare EBO after binding the VAO. So, it will hold the EBO's data. Then call glDrawElements() instead of glDrawArrays();
+```cpp
+GLuint EBO;
+glGenBuffers(1, &EBO);
+glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+...
+...
+while(true){
+    ...
+    ...
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0); // 2nd argument is number of indices, 3rd is type of indices, last is just offset
+    ...
+    ...
+}
+```
+Our output looks like this now.
+![Rectangle](/assets/images/rectangle.png)
+
+So, We have covered a lot till this point which gives us the fundamental knowledge for rendering a single and later 1 Million spheres. In the next post, I'll try to cover everything we need to understand 3D in OpenGL.
