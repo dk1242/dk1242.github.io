@@ -3,9 +3,9 @@ layout: post
 title:  "Rendering 1 Million spheres: Part 2 (3D basics with OpenGL)"
 date:   2025-05-19
 ---
-This post is the continuation of my previous [post](https://dk1242.github.io/2025/05/13/Rendering-1M-spheres-1.html) which was the part of this series. In this blog, we will cover the textures, 3D basics including lighting and camera, a little about coordinate system.
+This post is the continuation of my previous [post](https://dk1242.github.io/2025/05/13/Rendering-1M-spheres-1.html) which is the first part of this series. In this blog, we will cover the textures, 3D basics including lighting and camera.
 
-But before starting, I want to modularize our existing code, so it can follow the OOP principles. 
+But before we start, I want to modularize our existing code, so it can follow the OOP principles. 
 
 ### Code Refactoring
 Till now we are using VBO, VAO, EBO and Shaders. So, we'll create classes for all these objects. Then we'll create a common class `Mesh` to put all these Buffer objects together.
@@ -150,3 +150,5 @@ void setFloat(const std::string &name, float value) const
 // glUniform1fv: for a float vector/array.
 // glUniform4f : for 4 floats.
 ```
+
+## Textures
