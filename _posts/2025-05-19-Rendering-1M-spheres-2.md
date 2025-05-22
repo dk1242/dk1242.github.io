@@ -280,3 +280,152 @@ mytexture.texUnit(sphereShader, "sampleTexture", 0);
 
 Now, you should be able to see a texture over your rectangle.
 ![alt text](/assets/images/rectTexture.png)
+
+## Different Coordinates systems
+We usually defines our objects coordinates in a world space, means the object positions can range from -INF to INF in all 3 directions, but our Normalized Device Coordinates ranges from -1.0 to 1.0 in both x and y axis on our screen. There is a sequence we need to follow for transforming the objects from world space to NDC. There are 5 different coordinate systems through which we'll pass:
+1. Local space - Local space defines the coordinates space which is local to our object like the origin of our object, any transformation like rotationetc. In ideal case, the origin should be in the center of the object but sometimes we need it at the corners (suppose to rotate it from the corner). These transformation details like scaling, rotation and translation, we can store in the local space, which we will be passed to global space through a model matrix consisting of all these local space details.
+2. World/Global space - When we import multiple objects in our application, they will set their position at origin (0, 0, 0) by default. But we dont want this behaviour, so we will change their positions in world space to create our desired scene. We can also perform differnt operations like rotation and scaling in the world space too. It will not affect the local space properties for that object (means if we have 2 instance of same object, the transformations on one will not affect the other).
+3. View/Camera/Eye space - When we'll place a camera in our world, it can see only some specific part like in the back, it cannot see. So we need to perform some transformations which will transform the coordinates to our camera space. We'll discuss about these transformation in the **Camera** section
+4. Clip space - As we want our final coordinates in between -1.0 and 1.0, we will use a projection matrix that specifies a range of coordinates in each direction, and the objects lying outside this range will not be clipped and mapped in between -1.0 and 1.0 . If we visualize this projection matrix, it will look like a 3d container or frustum, which will hold the objects inside and whatever is outside of it, will not be rendered on the screen. This projection matrix converts 3d coordinates to device coordinates which can be mapped to NDC. 
+5. Screen space - In last, the clip space coordinates will be converted to screen space coorinates using viewport transform. The coordinates of range -1.0 and 1.0 will changed to the range define by glViewport i.e. 0 to WIDTH in x-axis and 0 to HEIGHT in y-axis.
+
+So, finally a coordinate in clip space will get transformed as
+
+$
+V_{clip} = M_{projection} * M_{view} * M_{model} * V_{local}
+$
+## Camera
+To define a camera in 3D space, we need some particular vectors like 
+1. Position vector - it defines the current position of our camera (x, y, z)
+2. Direction vector - it defines the direction in which we are currently targeting. It can be calculated by subtracting the position vector and target Position vector and then normalize it.
+```cpp
+glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
+```
+3. Up axis - It tell the up direction for camera space. As we are taking the up direction in y-axis, it will be (0, 1, 0);
+```cpp
+glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
+```
+4. Right axis - It represent the positive x-axis of camera space. We can calculate it by doing a cross product between Up vector and Camera Direction vector, it will result in a perpendicular vector to both.
+```cpp
+glm::vec3 RightDir = glm::normalize(glm::cross(Orientation, Up));
+```
+
+Now we need to define two matrices, view and projection matrix, which helps us in converting world coordinates to clip space coordinates. 
+
+The View matrix can be calculated by using `glm::lookAt(position, target, Up)` function.
+The projection matrix can be defined in two ways as we have two different types of camera systems - perspective camera (how humans perceives world) and orthographic camera(when everything will have same size with different distance). 
+* Perspective projection - Perspective projection is very similar to how humans perceives the world like distant objects will look smaller than the near objects. We will also try to convert our world space coordinates in such a way that it will produce the same result. If you remember we had a `w` parameter from gl_Position, it will increase with the distance from the camera and then the (x, y, z) coordinates will be divided by the corresponding w value, which will result in NDC.
+A perspective matrix can be defined using `glm::perspective(FOVangle, aspectRatio, near, far)`. We can visualize a perspective frustum like the following diagram:
+
+![Perspective frustum ](/assets/images/perspective_frustum.png)
+
+* Orthographic projection - Orthographic projection is just like when every object will be of same size regardless of the distance. In this case, the w value will always be 1.0. It can be defined using `glm::ortho(left, right, bottom, top, near, far);`. We can visualize an orthographic frustum like following image:
+
+![Orthographic frustum](/assets/images/orthographic_frustum.png)
+
+Before start using camera here, We'll create a Camera class which have functions to support handling inputs for cmaera movement, updating the viewProjection/camera matrix for shader.
+```cpp
+class Camera {
+public:
+	glm::vec3 Position = glm::vec3(0.0f, 0.0f, 10.0f);
+	glm::vec3 Orientation = glm::vec3(0.0f, 0.0f, -1.0f);
+	glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
+	glm::vec3 RightDir = glm::normalize(glm::cross(Orientation, Up));
+	
+	glm::mat4 view;
+	glm::mat4 projection;
+	glm::mat4 cameraMatrix = glm::mat4(1.0f);
+
+	int width;
+	int height;
+
+	Camera(int width, int height, glm::vec3 position);
+
+	// Updates the camera(viewProjection) matrix for the Vertex Shader
+	void updateMatrix(float FOVdeg, float nearPlane, float farPlane);
+	// Exports the camera matrix to a shader
+	void Matrix(Shader& shader, const char* uniform);
+	// Handles camera inputs
+	void Inputs(GLFWwindow* window);
+};
+```
+We can update cameraMatrix in updateMatrix function and handle keyboard inputs for camera movement in Inputs function.
+```cpp
+void Camera::updateMatrix(float FOVdeg, float nearPlane, float farPlane)
+{
+	// Initializes matrices since otherwise they will be the null matrix
+	view = glm::mat4(1.0f);
+	projection = glm::mat4(1.0f);
+
+	// Makes camera look in the right direction from the right position
+	view = glm::lookAt(Position, Position + Orientation, Up); //Position + orientation will give the direction
+	// Adds perspective to the scene
+	projection = glm::perspective(glm::radians(FOVdeg), (float)width / height, nearPlane, farPlane); // using a perspective camera
+
+	// Sets new camera matrix
+	cameraMatrix = projection * view;
+}
+void Camera::Inputs(GLFWwindow* window)
+{
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+	{
+		Position += speed * Orientation; // changes position in the orientation (inside screen, -z axis) direction
+	}
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+	{
+		Position += speed * -glm::normalize(glm::cross(Orientation, Up)); // changes position in the left (-x axis) direction
+	}
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+	{
+		Position += speed * -Orientation;  // changes position in the opposite (out of screen) orientation (z axis) direction
+	}
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+	{
+		Position += speed * glm::normalize(glm::cross(Orientation, Up)); // changes position in the right (x axis) direction
+	}
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+	{
+		Position += speed * Up;  // change position in the Up (y axis) direction
+	}
+	if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+	{
+		Position += speed * -Up; // change position in the Down (-y axis) direction
+	}
+}
+```
+We also have to set this new cameraMatrix in vertex shader uniform using Matrix function.
+```cpp
+void Camera::Matrix(Shader& shader, const char* uniform)
+{
+	glUniformMatrix4fv(glGetUniformLocation(shader.ID, uniform), 1, GL_FALSE, glm::value_ptr(cameraMatrix));
+}
+```
+We also need to do some changes in our existing shader code to properly use the camera functionality in our application.
+```GLSL
+// Vertex shader
+// add 2 extra uniforms
+uniform mat4 camMatrix;
+uniform mat4 model;
+...
+void main(){
+    ...
+    gl_Position = camMatrix * vec4(model, 1.0);
+}
+```
+In last, just call Input and updateMatrix function inside your rendering while loop. 
+```cpp
+while(true){
+    ...
+    camera.Inputs(window);
+    camera.updateMatrix(45.0f, 0.1f, 300.0f);
+    ...
+}
+// Inside Mesh::Draw function
+void Mesh::Draw(Shader& shader, Camera& camera){
+    shader.Activate();
+    ...
+    camera.Matrix(shader, "camMatrix");
+    ...
+}
+```
+Now you should be able to move in the scene with camera.
