@@ -11,3 +11,15 @@ body {
 .wrapper {
   max-width: 900px !important;
 }
+mjx-container {
+  font-size: 1.75em !important; /* Scales relative to surrounding text */
+  overflow-x: auto;
+  word-wrap: normal;
+}
+
+mjx-container[display="true"] {
+  display: block;
+  text-align: center;
+  // margin: 1em 0;
+  padding: 2.5%;
+}

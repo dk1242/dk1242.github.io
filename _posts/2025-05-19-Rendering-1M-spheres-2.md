@@ -1,16 +1,19 @@
 ---
 layout: post
-title:  "Rendering 1 Million spheres: Part 2 (3D basics with OpenGL)"
-date:   2025-05-19
+title: "Rendering 1 Million spheres: Part 2 (3D basics with OpenGL)"
+date: 2025-05-19
 ---
-This post is the continuation of my previous [post](https://dk1242.github.io/2025/05/13/Rendering-1M-spheres-1.html) which is the first part of this series. In this blog, we will cover the textures, 3D basics including lighting and camera.
 
-But before we start, I want to modularize our existing code, so it can follow the OOP principles. 
+This post is a continuation of my previous [post](https://dk1242.github.io/2025/05/13/Rendering-1M-spheres-1.html) which is the first part of this series. In this blog, we will cover the textures, 3D basics including lighting and the camera.
+
+But before we start, I want to modularize our existing codeto follow the OOP principles.
 
 ### Code Refactoring
-Till now we are using VBO, VAO, EBO and Shaders. So, we'll create classes for all these objects. Then we'll create a common class `Mesh` to put all these Buffer objects together.
 
-For Buffer objects, we majorly need one unsigned integer variable to reference it, one Bind function, one Unbind function and one last Delete function just for the cleanup.
+o far, we’ve been using VBO, VAO, EBO and Shaders. So, we'll create classes for all these objects. Then we'll create a common `Mesh` class to encapsulate all these Buffer objects together.
+
+For Buffer objects, we mainly need a single unsigned integer variable to reference it, a `Bind` function, an `Unbind` function and a `Delete` function for cleanup.
+
 ```cpp
 class VBO
 {
@@ -23,9 +26,11 @@ public:
 	void Bind() const; // call glBindBuffer(GL_ARRAY_BUFFER, ID);
 	void Unbind(); // call glBindBuffer(GL_ARRAY_BUFFER, 0);
 	void Delete() const; // call glDeleteBuffers(1, &ID);
-};	
+};
 ```
-In case of VAO, we also need one extra function to link a VBO attribute to VAO.
+
+In the case of VAO, we also need an extra function to link a VBO attribute to the VAO.
+
 ```cpp
 void VAO::LinkAttrib(VBO& VBO, GLuint layout, GLuint numComponents, GLenum type, GLsizeiptr stride, void* offset){
     VBO.Bind();
@@ -35,7 +40,8 @@ void VAO::LinkAttrib(VBO& VBO, GLuint layout, GLuint numComponents, GLenum type,
 }
 ```
 
-Now, we need to create a ShaderClass to handle vertex and fragment shader objects creation, their compilation and then shader program object creation and compilation. Also we need to handle the shader Activation.
+Now, we need to create a `Shader` class to handle vertex and fragment shader objects creation, their compilation, followed by creation and linking of the shader program object. We also need to handle shader activation.
+
 ```cpp
 
 std::string get_file_contents(const char* filename); // reads the file and returns its content in string
@@ -52,18 +58,21 @@ private:
 	void compileErrors(unsigned int shader, const char* type);
 };
 ```
-We can create ShaderClass object like 
+
+We can create ShaderClass object like
 
 ```cpp
 Shader sphereShader("./sphere.vert", "./sphere_pbr.frag", "PBR");
 ```
+
 We also have to create a Mesh class which will combine all this.
+
 ```cpp
 class Mesh {
 public:
     std::vector <glm::vec3> vertices;
     std::vector <GLuint> indices;
-    
+
     VAO mainVAO;
 
 	Mesh(std::vector <glm::vec3>& vertices, std::vector <GLuint>& indices);
@@ -71,7 +80,9 @@ public:
     void Draw(Shader& shader);
 }
 ```
+
 I'll also define `Mesh()` and `Draw()` functions just for your reference.
+
 ```cpp
 // Mesh.cpp file
 Mesh::Mesh(std::vector<glm::vec3>& vertices, std::vector<GLuint>& indices) // Constructor for Mesh class
@@ -97,7 +108,9 @@ void Mesh::Draw(Shader& shader) // Draw function for Mesh Object
     glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 }
 ```
+
 So, we will initialize a Mesh `rectangle` like
+
 ```cpp
 std::vector<glm::vec3> vertices = {
     glm::vec3(0.5f,  0.5f, 0.0f),
@@ -120,10 +133,13 @@ while(true){
     ...
 }
 ```
+
 > Todo: Add link to source code
 
-### Some more basics of Shaders 
-Till now we know how to pass data to vertex shader. But to pass data from vertex shader to fragment shader, we need to declare a variable in vertex shader with `out` and then declare it with same name in fragment shader but with `in`.
+### Some more basics of Shaders
+
+Till now we have seen how to pass data to vertex shader. To pass data from vertex shader to fragment shader, we need to declare a variable in vertex shader with `out` and then redeclare it with same name in fragment shader but with `in`.
+
 ```glsl
 // inside vertex shader
 out vec4 color;
@@ -131,53 +147,60 @@ out vec4 color;
 // inside fragment shader
 in vec4 color;
 ```
-There is one more way to pass data to shaders and that is `Uniforms`. But they works a little differently as they are global for one particular shader progrma, can be accessed in both vertex and fragment shaders, can be accessed and updated at any stage of application.
-We can declare them directly with `uniform` like `uniform vec4 color;`
-For setting there values from opengl, we need to call some particular functions defined for each particular data type. Better we add them directly inside our SgaderClass class.
+
+There is one more way to pass data to shaders and that is `Uniforms`. But they work a little differently as they are global for a particular shader progrma, can be accessed in both vertex and fragment shaders, and can be accessed or updated at any stage of the application.
+We can declare them using the `uniform` keyword, for example: `uniform vec4 color;`
+To set their values from OpenGL, we need to use specific functions based on the data type. It’s better to add these functions directly inside our Shader class.
+
 ```cpp
 void setBool(const std::string &name, bool value) const
-{         
-    glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value); 
+{
+    glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value);
 }
 void setInt(const std::string &name, int value) const
-{ 
+{
     glUniform1i(glGetUniformLocation(ID, name.c_str()), value); // glUniform1i for integer
 }
 void setFloat(const std::string &name, float value) const
-{ 
+{
     glUniform1f(glGetUniformLocation(ID, name.c_str()), value); // glUniform1f for float
-} 
+}
 // glUniform1fv: for a float vector/array.
 // glUniform4f : for 4 floats.
 ```
 
 ## Textures
-We can understand Textures as just a 2D image which we can paste over our 3D object. Till now we were filling a color over an object by directly passing the RGB values but now we will sample them from a texture and apply those RGB values over that object.
 
-But for that we need to define which part of texture (texture coordinate) maps to which vertex. Each vertex should have texture coordinate associated with it. Texture coordinates have range between 0 and 1 in both x and y axis. The retrieval of texture color using texture coorinates is defined as **Sampling**.
+Textures can be understood as 2D images which we can mapped over our 3D object. Till now we were filling a color over an object by directly passing the RGB values but now we will sample them from a texture and apply the resulting RGB values to that object.
 
-Generally, we defines our texture coordinates in between range of 0 and 1, to completely wrap the texture over the object. But if we define them outside of this range of 0 and 1, by default, they will start repeating. Lets suppose if I define them between 0 and 5, the texture will repeat for 5 times by defualt but we can also assign different behaviours like mirrored repeat, clamping to border and clamping to edge.
+But for that we need to define which part of texture (texture coordinate) maps to which vertex. Each vertex should have a texture coordinate associated with it. Texture coordinates have range between 0 and 1 in both x and y axis. The retrieval of texture color using texture coordinates is defined as **Sampling**.
+
+Generally, we define our texture coordinates in between range of 0 and 1, to completely wrap the texture over the object. But if we define them outside of this range of 0 and 1, by default, they will start repeating. Suppose we define them between 0 and 5, the texture will repeat for five times by default but we can also assign different behaviors like mirrored repeat, clamp to border and clamp to edge.
 We can assign all these properties using `glTexParameteri()`.
 
-For texture filtering, we have two options like `GL_NEAREST` and `GL_LINEAR`. GL_NEAREST is default texture filtering method which results in blocked pattern and will clearly define the edges while GL_LINEAR gives a smooth pattern for edges. We will decide what to use will totally depend on our requirement. 
-Generally, we set it based on like when scaling up (magnifying), use GL_LINEAR and for downscaled texture use GL_NEAREST.
+For texture filtering, we have two options like `GL_NEAREST` and `GL_LINEAR`. GL_NEAREST is default texture filtering method which results in blocky pattern and will clearly define the edges while GL_LINEAR gives a smooth pattern for edges. We will decide what to use will totally depend on our requirement.
+Generally, we typically set it such that when scaling up (magnifying), use GL_LINEAR and for downscaled texture use GL_NEAREST.
 
-We also have option to create mipmaps, which allows us to create different texture for different sizes (mostly of lesser resolutions). It enables us to not use a large resolution texture for the objects which are far from our camera. It will also help in improving the performance.
+We also have option to create mipmaps, which allows us to create different texture versions for different resolutions (always of lesser resolutions). It enables us to not use a large resolution texture for the objects which are far from our camera. It will also help in improving the performance.
 
 ### Creating a Texture
-To upload an image for generating a texture, we will use a library called **stb_image.h**. You can download it from [here](https://github.com/nothings/stb/blob/master/stb_image.h) and then save it to your project. Then create a new cpp file with name `stb.cpp` and include following code:
+
+To upload an image for generating a texture, we will use a library called **stb_image.h**. You can download it from [here](https://github.com/nothings/stb/blob/master/stb_image.h) and then save it to your project. Then create a new cpp file named `stb.cpp` and include the following code:
+
 ```cpp
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 ```
-Now we will start by creating a Texture class for our application including same bind, unbind and delete function. We also need to set our texture to shader, for that we'll create one more function.
+
+Now we will start by creating a Texture class for our application including standard `Bind`, `Unbind` and `Delete` function. We also need to bind our texture to a shader, for that we'll create one more function.
+
 ```cpp
 class Texture {
 public:
 	GLuint ID = 0;
-    
+
 	Texture(const char* image, GLenum slot, GLenum format, GLenum pixelType);
-	
+
 	// Assigns a texture unit to a Shader
 	void texUnit(Shader& shader, const char* uniform, GLuint unit);
 	// Binds a texture
@@ -188,14 +211,16 @@ public:
 	void Delete() const;
 };
 ```
-We will declare our Texture constructor such that it will load our image and create a texture. Textures are generated with `glTexImage2D()` and we need to pass following parameters to it.
-* First argument - texture target, which is `GL_TEXTURE_2D` for now
-* Second arg - the mipmap level, for which we want to generate this texture
-* Third arg - the format in which we want to save texture, it's `RGB` because our image contains that data only
-* Fourth and Fifth argument defines the width and height
-* Sixth argument will always be 0.
-* 7th arg tells the format (RGB) and data type (`GL_UNSIGNED_BYTE`) of our image
-* 8th arg is the actual image data
+
+We will declare our Texture constructor such that it will load our image and generate and configure a texture. Textures are generated with `glTexImage2D()` and we need to pass following parameters to it.
+
+- First argument - texture target, which is `GL_TEXTURE_2D` for now
+- Second arg - the mipmap level, for which we want to generate this texture
+- Third arg - the format in which we want to save the texture on GPU, it's `RGB` because our image contains that data only
+- Fourth and Fifth argument defines the width and height
+- Sixth argument will always be 0.
+- The seventh argument specifies the format (e.g., `GL_RGB`) and the data type (e.g., `GL_UNSIGNED_BYTE`) of the source image data.
+- The eighth argument is a pointer to the image data.
 
 ```cpp
 Texture::Texture(const char* imagePath, GLenum slot, GLenum format, GLenum pixelType)
@@ -210,7 +235,7 @@ Texture::Texture(const char* imagePath, GLenum slot, GLenum format, GLenum pixel
 	else {
 		std::cout << imagePath << " loaded correctly.\n";
 	}
-    // genearating and binding texture 
+    // genearating and binding texture
 	glGenTextures(1, &ID); // first argument is the number of textures we want to generate, 2nd arg is the address where we want to store them
 	glBindTexture(GL_TEXTURE_2D, ID);
 
@@ -221,7 +246,7 @@ Texture::Texture(const char* imagePath, GLenum slot, GLenum format, GLenum pixel
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, widthImg, heightImg, 0, format, pixelType, bytes); 
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, widthImg, heightImg, 0, format, pixelType, bytes);
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	stbi_image_free(bytes);
@@ -237,7 +262,9 @@ void Texture::texUnit(Shader& shader, const char* uniform, GLuint unit)
 ```
 
 ### Applying Textures
+
 We will pass the texture coordinates like following
+
 ```cpp
 std::vector<glm::vec2> texCoords = {
     glm::vec2(0.0f, 0.0f),
@@ -246,11 +273,15 @@ std::vector<glm::vec2> texCoords = {
     glm::vec2(1.0f, 1.0f)
 };
 ```
-Then we need to pass these coordinates to the shader code too. For that we need to create a new VBO and `VBO(glm::vec2)` constructor which supports glm::vec2, bind it with the pre existing VAO and finally link it.
+
+Then we need to pass these coordinates to the shader code too. For that we need to create a new VBO and add a constructor that supports `glm::vec2`, bind it to the pre existing VAO and finally link it.
+
 ```cpp
 mainVAO.LinkAttrib(texCoordVBO, 1, 2, GL_FLOAT, sizeof(glm::vec2), (void*)(0));
 ```
-In shader side, we need to define a layout with location=1 for texture Coordinates and pass this to fragment shader. In fragment shader, we will assign FragColor with texture () function provided by GLSL, in which we need to pass texture sampler and texture coordinates. This texture function return the corresponding color at the texture coordinates, considering the parameters we set.
+
+In the shader side, we need to define a layout with `location = 1` for texture Coordinates and pass this data to the fragment shader via an out variable in the vertex shader and in variable in the fragment shader. In fragment shader, we will assign FragColor with `texture ()` function provided by GLSL, in which we need to pass texture sampler and texture coordinates. This `texture()` function returns the color sampled from the texture at the given coordinates.
+
 ```GLSL
 // In vertex shader
 layout (location = 1) in vec2 aTexCoord;
@@ -269,7 +300,9 @@ void main()
     FragColor = texture(sampleTexture, TexCoord);
 }
 ```
-In last, we just need to activate, bind the texture and set the uniform for `sampleTexture`.
+
+Finally, activate and bind the texture, then set the uniform sampler (e.g., `sampleTexture`) in your shader program..
+
 ```cpp
 glActiveTexture(GL_TEXTURE0);
 glBindTexture(GL_TEXTURE_2D, myTexture.ID);
@@ -278,30 +311,39 @@ glBindTexture(GL_TEXTURE_2D, myTexture.ID);
 mytexture.texUnit(sphereShader, "sampleTexture", 0);
 ```
 
-Now, you should be able to see a texture over your rectangle.
+At this point, you should be able to see the texture drawn on your rectangle.
 ![alt text](/assets/images/rectTexture.png)
 
 ## Different Coordinates systems
-We usually defines our objects coordinates in a world space, means the object positions can range from -INF to INF in all 3 directions, but our Normalized Device Coordinates ranges from -1.0 to 1.0 in both x and y axis on our screen. There is a sequence we need to follow for transforming the objects from world space to NDC. There are 5 different coordinate systems through which we'll pass:
-1. Local space - Local space defines the coordinates space which is local to our object like the origin of our object, any transformation like rotationetc. In ideal case, the origin should be in the center of the object but sometimes we need it at the corners (suppose to rotate it from the corner). These transformation details like scaling, rotation and translation, we can store in the local space, which we will be passed to global space through a model matrix consisting of all these local space details.
-2. World/Global space - When we import multiple objects in our application, they will set their position at origin (0, 0, 0) by default. But we dont want this behaviour, so we will change their positions in world space to create our desired scene. We can also perform differnt operations like rotation and scaling in the world space too. It will not affect the local space properties for that object (means if we have 2 instance of same object, the transformations on one will not affect the other).
-3. View/Camera/Eye space - When we'll place a camera in our world, it can see only some specific part like in the back, it cannot see. So we need to perform some transformations which will transform the coordinates to our camera space. We'll discuss about these transformation in the **Camera** section
-4. Clip space - As we want our final coordinates in between -1.0 and 1.0, we will use a projection matrix that specifies a range of coordinates in each direction, and the objects lying outside this range will not be clipped and mapped in between -1.0 and 1.0 . If we visualize this projection matrix, it will look like a 3d container or frustum, which will hold the objects inside and whatever is outside of it, will not be rendered on the screen. This projection matrix converts 3d coordinates to device coordinates which can be mapped to NDC. 
+
+In 3D graphics, we usually define object coordinates in world space, where positions can theoretically range from −INF to +INF in all three directions. However, the Normalized Device Coordinates (NDC) - the final coordinates used to render on the screen - ranges from -1.0 to 1.0 in both the X and Y axes of screen.
+
+To transform object coordinates from their local origin to NDC, they pass through the following five coordinate systems:
+
+1. Local/Model space - Local space defines the coordinates space which is local to our object. For example, the origin `(0,0,0)` is often placed at the center of the object, but it can be at a corner if needed (e.g., for rotating around a corner). Transformations like `scaling`, `rotation`, and `translation` are applied here using a model matrix. This matrix encodes how the object should be positioned and oriented in the world space.
+2. World/Global space - World space places all objects in a common 3D environment. When we load multiple objects, they initially appear at the world origin (0,0,0), but we typically reposition them using world-space transformations.
+Changes in world space (e.g., moving or rotating the object) do not affect the local properties of the object. So, if we have two instances of the same object, world-space transformations applied to one will not impact the other.
+3. View/Camera/Eye space - This space represents what the camera sees. A view matrix transforms world-space coordinates into camera-space coordinates, placing the camera at the origin and rotating/transforming everything relative to it.
+This transformation ensures that only objects within the camera’s field of view are considered for rendering. We'll discuss more about it in the `Camera` section.
+4. Clip space - As we want our final coordinates in between -1.0 and 1.0, we will use a projection matrix that specifies a range of coordinates in each direction, and the objects lying outside this range will not be clipped and mapped in between -1.0 and 1.0 . The projection matrix transforms view-space coordinates into clip space. If we visualize this projection matrix, it will look like a 3d container or frustum, which will hold the objects inside and whatever is outside of it, will not be rendered on the screen. This projection matrix converts 3d coordinates to device coordinates which can be mapped to NDC.
 5. Screen space - In last, the clip space coordinates will be converted to screen space coorinates using viewport transform. The coordinates of range -1.0 and 1.0 will changed to the range define by glViewport i.e. 0 to WIDTH in x-axis and 0 to HEIGHT in y-axis.
 
 So, finally a coordinate in clip space will get transformed as
 
-$
-V_{clip} = M_{projection} * M_{view} * M_{model} * V_{local}
-$
+$$
+V_{clip} = M_{projection} \cdot M_{view} \cdot M_{model} \cdot V_{local}
+$$
+
 ## Camera
-To define a camera in 3D space, we need some particular vectors like 
-1. Position vector - it defines the current position of our camera (x, y, z)
-2. Direction vector - it defines the direction in which we are currently targeting. It can be calculated by subtracting the position vector and target Position vector and then normalize it.
+
+To define a camera in 3D space, we simulate its behavior by transforming the world relative to the camera. This transformation is represented by the `view` matrix. To compute it, we need a few important vectors:
+
+1. Position vector - It defines the current position of our camera in world space, `(x, y, z)`.
+2. Direction vector - It defines the direction the camera is looking. It is calculated by subtracting the camera's position and target Position, and then normalizing it.
 ```cpp
 glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
 ```
-3. Up axis - It tell the up direction for camera space. As we are taking the up direction in y-axis, it will be (0, 1, 0);
+3. Up axis - It tell the `up` direction for camera space. As we are taking the `up` direction in y-axis, it will be (0, 1, 0);
 ```cpp
 glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
 ```
@@ -310,20 +352,28 @@ glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
 glm::vec3 RightDir = glm::normalize(glm::cross(Orientation, Up));
 ```
 
-Now we need to define two matrices, view and projection matrix, which helps us in converting world coordinates to clip space coordinates. 
+Now we need to define two matrices, view and projection matrix, which helps us convert world coordinates to clip space coordinates.
 
 The View matrix can be calculated by using `glm::lookAt(position, target, Up)` function.
-The projection matrix can be defined in two ways as we have two different types of camera systems - perspective camera (how humans perceives world) and orthographic camera(when everything will have same size with different distance). 
-* Perspective projection - Perspective projection is very similar to how humans perceives the world like distant objects will look smaller than the near objects. We will also try to convert our world space coordinates in such a way that it will produce the same result. If you remember we had a `w` parameter from gl_Position, it will increase with the distance from the camera and then the (x, y, z) coordinates will be divided by the corresponding w value, which will result in NDC.
+The projection matrix can be defined in two ways as we have two different types of camera systems - `perspective` camera (how humans perceive the world) and `orthographic` camera(where all objects appear the same size regardless of distance).
+
+- Perspective projection - Perspective projection is very similar to how humans perceive the world like distant objects will look smaller than the near objects. We will also try to convert our world space coordinates in such a way that it will produce the same result. If you remember we had a `w` parameter from `gl_Position`, it will increase with the distance from the camera and then the (x, y, z) coordinates will be divided by their corresponding w value, which will result in NDC.
 A perspective matrix can be defined using `glm::perspective(FOVangle, aspectRatio, near, far)`. We can visualize a perspective frustum like the following diagram:
 
-![Perspective frustum ](/assets/images/perspective_frustum.png)
+<!-- ![Perspective frustum ](/assets/images/perspective_frustum.png) -->
+<div style="text-align: center;">
+  <img src="/assets/images/perspective_frustum.png" alt="Perspective frustum" style="width: 100%; max-width: 500px; height: auto;"/>
+</div>
+<br/>
+* Orthographic projection - Orthographic projection is just like where all objects appear the same size regardless of distance. In this case, the w value will always be 1.0. It can be defined using `glm::ortho(left, right, bottom, top, near, far);`. We can visualize an orthographic frustum like following image:
+<div style="text-align: center;">
+  <img src="/assets/images/orthographic_frustum.png" alt="Orthographic frustum" style="width: 100%; max-width: 500px; height: auto;"/>
+</div>
+<br/>
+<!-- ![Orthographic frustum](/assets/images/orthographic_frustum.png) -->
 
-* Orthographic projection - Orthographic projection is just like when every object will be of same size regardless of the distance. In this case, the w value will always be 1.0. It can be defined using `glm::ortho(left, right, bottom, top, near, far);`. We can visualize an orthographic frustum like following image:
+Before starting to use the camera, We'll create a Camera class which has functions to support handling inputs for camera movement and updating the viewProjection/camera matrix for shader.
 
-![Orthographic frustum](/assets/images/orthographic_frustum.png)
-
-Before start using camera here, We'll create a Camera class which have functions to support handling inputs for cmaera movement, updating the viewProjection/camera matrix for shader.
 ```cpp
 class Camera {
 public:
@@ -331,7 +381,7 @@ public:
 	glm::vec3 Orientation = glm::vec3(0.0f, 0.0f, -1.0f);
 	glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
 	glm::vec3 RightDir = glm::normalize(glm::cross(Orientation, Up));
-	
+
 	glm::mat4 view;
 	glm::mat4 projection;
 	glm::mat4 cameraMatrix = glm::mat4(1.0f);
@@ -349,7 +399,9 @@ public:
 	void Inputs(GLFWwindow* window);
 };
 ```
-We can update cameraMatrix in updateMatrix function and handle keyboard inputs for camera movement in Inputs function.
+
+We can update `cameraMatrix` in `updateMatrix()` function and handle keyboard inputs for camera movement in Inputs function.
+
 ```cpp
 void Camera::updateMatrix(float FOVdeg, float nearPlane, float farPlane)
 {
@@ -393,14 +445,18 @@ void Camera::Inputs(GLFWwindow* window)
 	}
 }
 ```
-We also have to set this new cameraMatrix in vertex shader uniform using Matrix function.
+
+We also have to set this new `cameraMatrix` as a uniform in the vertex shader using Matrix function.
+
 ```cpp
 void Camera::Matrix(Shader& shader, const char* uniform)
 {
 	glUniformMatrix4fv(glGetUniformLocation(shader.ID, uniform), 1, GL_FALSE, glm::value_ptr(cameraMatrix));
 }
 ```
+
 We also need to do some changes in our existing shader code to properly use the camera functionality in our application.
+
 ```GLSL
 // Vertex shader
 // add 2 extra uniforms
@@ -412,7 +468,9 @@ void main(){
     gl_Position = camMatrix * vec4(model, 1.0);
 }
 ```
-In last, just call Input and updateMatrix function inside your rendering while loop. 
+
+Lastly, call Input and updateMatrix function inside your rendering while loop.
+
 ```cpp
 while(true){
     ...
@@ -428,4 +486,13 @@ void Mesh::Draw(Shader& shader, Camera& camera){
     ...
 }
 ```
+
 Now you should be able to move in the scene with camera.
+
+So, we're done with the 3D basics - we mainly covered different coordinate systems and the camera. Lighting is left, but I won't cover it in this blog; I'll go through it later when we dive into `PBR`.
+
+In the next blog, I'll cover how to render circles and spheres, and explore how to start scaling them to 1 Million without performing any indirect optimization.
+
+<script type="text/javascript" id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
