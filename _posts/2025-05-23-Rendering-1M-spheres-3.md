@@ -145,9 +145,105 @@ glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   <img src="/assets/images/spherePolygons.png" alt="Rendered Sphere" style="width: 100%; max-width: 720px; height: auto;"/>
 </div>
 <br/>
-## Spheres
-Now that we know how to draw a sphere, we will try to scale it.
 
+## Spheres
+Now that we know how to draw a Sphere, we will try to scale it.
+
+So, the first approach we can follow is very simple and direct, just create an array to store the vertices `vector<vector<glm::vec3>> baseSphereVertices;` and for indices we can use the same indices array. Then create an array of objects of Mesh class `vector<Mesh>spheres` and create multiple objects of Mesh class with these different vertices and indices and `push_back` them to spheres array.
+```cpp
+vector<Mesh>spheres;
+Mesh baseSphere(baseSphereVertices, baseSphereInd);
+spheres.push_back(baseSphere);
+```
+Now, inside rendering loop, run another for loop to draw each sphere.
+This approach will work for some 1000s spheres but after that it will stop working smoothly, fps will drop and delayed update on screen. For my machine, it went well till some `1.5k` spheres and after that fps started dropping.
+
+So what's the next thing we can do to improve the performance with more number of spheres. We can use some direct and indirect methods like decreasing the data transfer between CPU and GPU, reducing the nummber of Draw calls to GPU.
+Currently inside our Draw() function, we are calling `glDrawElements` which draws a single sphere. So, when we call this Draw funtion for 1000 times, it calls 1000 draw calls to the GPU which is a very expensive operation. 
+But OpenGL provides a very useful function `glDrawElementsInstanced`, which allow us to draw same type of Mesh, `n` number of times with improved performance.
+```cpp
+glDrawElementsInstanced(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0, numInstances); // numInstances tells the number of times we want to draw a Mesh
+```
+But before we can use it, we need to setup some things. Till now we were passing all of the vertices for each sphere to the GPU, instead of this we will pass the vertices of 1 sphere and then only pass the origin center of all other spheres and inside our shader code only we will calculate the position of the other sphere vertices by translating the baseSphere verticed to current sphere origin point. This way we will improve our performance as we have shifted our calculation part of sphere vertices to GPU which can run a million of calculations parallely. We also need to create a new Mesh Contructor with new InstanceVBO class, which is similar to VBO class. It will modularize our code and we need a different function for linking instance VBOs to our VAO. 
+```cpp
+// VAO.cpp
+void VAO::LinkAttrib(InstanceVBO& instanceVBO, GLuint layout, GLuint numComponents, GLenum type, GLsizeiptr stride, void* offset) const
+{
+	instanceVBO.Bind();
+	glEnableVertexAttribArray(layout);
+	glVertexAttribPointer(layout, numComponents, type, GL_FALSE, stride, offset);
+	glVertexAttribDivisor(layout, 1); // the rate at which vertex attribute will advance per instance
+	instanceVBO.Unbind();
+}
+```
+```cpp
+// Mesh.cpp
+Mesh::Mesh(std::vector<Vertex>& vertices, std::vector<GLuint>& indices, std::vector<glm::vec3> &instancePositions)
+{
+	Mesh::vertices = vertices;
+	Mesh::indices = indices;
+	Mesh::instancePositions = instancePositions;
+	
+	mainVAO.Bind();
+
+	VBO mainVBO(vertices);
+	EBO mainEBO(indices);
+	InstanceVBO instanceVBO(instancePositions);
+
+	mainVAO.LinkAttrib(VBO, 0, 3, GL_FLOAT, sizeof(glm::vec3), (void*)0);
+
+	mainVAO.LinkAttrib(instanceVBO, 1, 3, GL_FLOAT, sizeof(glm::vec3), (void*)(0));
+
+	mainVAO.Unbind();
+	mainVBO.Unbind();
+	mainEBO.Unbind();
+	instanceVBO.Unbind();
+}
+...
+// new Draw function calling glDrawElementsInstanced
+void Mesh::Draw(Shader& shader, Camera& camera, GLsizei numInstances){
+    shader.Activate();
+	VAO.Bind();
+
+	camera.Matrix(shader, "camMatrix");
+    
+	glDrawElementsInstanced(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0, numInstances);
+}
+```
+We also need to do some changes in our vertex shader code to include instancePositions.
+```GLSL
+...
+layout (location = 1) in vec3 instancePos;
+...
+gl_Position = camMatrix * vec4(currPos + instancePos, 1.0); // shifting each vertex with instancePosition
+
+```
+
+```cpp
+// Main.cpp
+std::vector<glm::vec3> instancePositions;
+int numInstances = 25000; // For my machine, it worked good till ~25k spheres, after that frame drop
+instancePositions.resize(numInstances);
+
+for (int i = 0; i < numInstances; ++i) {
+	glm::vec3 position(
+		dis2(gen), dis2(gen), dis2(gen)
+	);
+	instancePositions[i] = position;
+}
+...
+Mesh baseSphere(sphereVertices, sphereIndices, instancePositions);
+...
+while(true){
+	...
+	baseSphere.Draw(shaderProgram, camera, numInstances);
+	...
+}
+```
+Now you should be able to draw around 25000 spheres (~ 93 M vertices) while maintaining the 60fps.
+
+As we are done for now, We learned how to draw a cirle, a sphere and a thousands of spheres.
+In the next article, we will cover more optimization methods including `Frustum Culling` and `Level of Detail`.
 <script>
 window.MathJax = {
   tex: {
