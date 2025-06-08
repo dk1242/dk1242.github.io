@@ -24,11 +24,13 @@ As the reflected amount of energy will never enter again the surface unless refl
 Now we need to consider the type of surface which will decide how much each individual light ray will contribute to the final reflected light of the surface given its material properties. So if its a smooth surface, light will reflect based on viewing angle and for a rough surface it will scatter in different directions.
 
 But for its calculation, we need to know some standard PBR equation which we kinda use in the real world. This is known as **reflectance equation**:
+
 $$
 \begin{align*}
 L_o(p, \omega_o) = \int_{\Omega} f_r(p, \omega_i, \omega_o)\, L_i(p, \omega_i)\, (\mathbf{n} \cdot \omega_i)\, d\omega_i
 \end{align*}
 $$
+
 To really understand PBR, we have to understand this equation truly.
 
 This equation calculates the outgoing radiance (magnitude or strength of light) at a point $p$ in direction $\omega_o$. It integrates all the incoming light from all direction $\omega_i$ over the hemisphere $\Omega$ above the point $p$, including material's reflectance and surface orientations.
