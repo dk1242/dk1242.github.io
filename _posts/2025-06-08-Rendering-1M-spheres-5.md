@@ -34,5 +34,19 @@ To really understand PBR, we have to understand this equation truly.
 This equation calculates the outgoing radiance (magnitude or strength of light) at a point $p$ in direction $\omega_o$. It integrates all the incoming light from all direction $\omega_i$ over the hemisphere $\Omega$ above the point $p$, including material's reflectance and surface orientations.
 * $f_r(p, \omega_i, \omega_o)$ is Bidirectional Reflectance Distribution Function (BRDF) which tells how much of the incoming light from direction $\omega_i$ is reflected toward $\omega_o$, depending on the material at $p$.
 * $L_i(p, \omega_i)$ is the incoming radiance at point $p$ from direction $\omega_i$.
-* $(\mathbf{n} \cdot \omega_i)$ is the dot product and cosine of the angle between surface normal $\mathbf{n}$ and incoming direction $\omega_i$. We use it to follow the law that light is weaker the less it directly radiates onto the surface, and strongest when it is directly perpendicular to the surface.
+* $(\mathbf{n} \cdot \omega_i)$ is the dot product and cosine of the angle between surface normal $\mathbf{n}$ and incoming direction $\omega_i$. We consider it to follow the law that light is weaker the less it directly radiates onto the surface, and strongest when it is directly perpendicular to the surface. It scales the energy based on the light's incidence angle to the surface.
 * $d\omega_i$ is the very small solid angle, which will get integrated over the hemisphere.
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
