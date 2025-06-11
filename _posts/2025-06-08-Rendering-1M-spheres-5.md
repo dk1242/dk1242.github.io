@@ -105,6 +105,7 @@ float DistributionGGX(vec3 N, vec3 H, float ROUGHNESS)
 }
 ```
 <br/>
+
 $G$ is <ins>**Geometry function**</ins>, which calculates how many microfacets are visible from both the view and light directions as sometimes due to roughness some microfacets blocks other microfacets to reflect the light. We will again use a very standard function, Smith's Schlick-GGX to calculate it.
 
 $$
@@ -118,16 +119,13 @@ where k is kinda similar to $\alpha$ (ROUGHNESS) but with some standard changes 
 $$
 \begin{align*}
 k_{direct} = \frac{(\alpha +1)^2}{8}
-\\
-k_{IBL} = \frac{\alpha^2}{2}
 \end{align*}
-$$
-
-$$
+\\
 \begin{align*}
 k_{IBL} = \frac{\alpha^2}{2}
 \end{align*}
 $$
+
 
 Similarly, we will calculate Geometry function for light direction, $G_{SchlickGGX}(n, l, k)$ and then combine it with $G_{SchlickGGX}(n, v, k)$.
 
@@ -159,6 +157,7 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float ROUGHNESS)
 }
 ```
 <br/>
+
 $F$ is <ins>**Fresnel equation**</ins>, which tells the ratio of amount of light which gets reflected versus the amount that gets refracted. It also varies over the angle we are looking at that surface. We can denote it using Fresnel-Schlick approximation:
 
 $$
@@ -184,9 +183,58 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 ```
-<br/>
-So, thats how we can implement Cook-Torrance BRDF in our fragment shader code. But now we have to integrated it first with direct lighting and then with IBL.
+### Radiance
+Now we have to calculate $L_i(p, \omega_i)$, which is the incoming radiance at point $p$ from direction $\omega_i$. It is determined by the light source's position, intensity and direction.
 
+In case of a direct lighting, we can say radiance function, $L_i(p, \omega_i)$ calculates light contribution at point $p$, taking into account light attenuation due to distance and relative angle between surface normal, $\mathbf{n}$ and incoming light direction $\omega_i$.
+
+We can integrate it in our fragment shader code as following:
+```GLSL
+//currPos is world Position here
+void main(){
+  vec3 N = normalize(Normal);
+  vec3 V = normalize(camPos - currPos);
+  ...
+  vec3 L = normalize(lightPositions[i] - currPos); // light direction
+  vec3 H = normalize(V + L); // halfway vector
+  float distance = distance(lightPositions[i], currPos);
+
+  float attenuation = 1.0 / distance; // its correct to use 1 / (distance * distance), but for more visual effect I'm using (1 / distance)
+  vec3 radiance = attenuation * lightColors[i]; // we will add angular dependency in final lighting calculation
+  ...
+}
+```
+Finally we will combine all calculations of Cook-Torrance BRDF and add with *directLighting* as following:
+```GLSL
+// Cook-Torrance BRDF
+float NDF = DistributionGGX(N, H, ROUGHNESS);
+float G = GeometrySmith(N, V, L, ROUGHNESS);
+vec3 fresnelTerm = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+vec3 numerator = NDF * G * fresnelTerm;
+float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001; // adding 0.001 so we will not divide numerator by 0 
+vec3 specular = numerator / denominator;
+
+vec3 kS = fresnelTerm; // specular reflection
+vec3 kD = vec3(1.0) - kS; // diffuse reflection
+kD *= 1.0 - METALNESS;
+
+float NdotL = max(dot(N, L), 0.0);
+
+directLighting += (kD * Albedo / PI + specular) * radiance * NdotL;
+```
+We can return FragColor with this *directLighting* or mix it with **Albedo**.
+```GLSL
+vec3 ambient = vec3(0.03) * Albedo * ao;
+vec3 color = directLighting + ambient;
+...
+FragColor = vec4(color, 1.0);
+```
+Now you will be able to see the spheres with direct lighting and PBR enabled. It will look more realistic and physically based. As, I have 9 lights and they are moving in a circluar path with variable speed, you define the number of lights, their positions, colors and everything as you want. I'll just share the output I got.
+
+![PBR with direct lighting](/assets/images/PBR_direct_lighting.png)
+
+So, we are done with PBR with direct lighting here. In next blog we will cover our last topic Image Based Lighting (IBL).
 
 <script>
 window.MathJax = {
