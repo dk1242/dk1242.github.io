@@ -24,7 +24,7 @@ We can define frustum Width and depth based on our scene. The minimum value we s
 We will calculate frustum height using the aspect ratio we have defined for our screen.
 ```cpp
 void Camera::UpdateFrustum() {
-    float frustumWidth = 180.0f;
+	float frustumWidth = 180.0f;
 	float frustumHeight = 9.0f / 16.0f * frustumWidth; 
 	float frustumDepth = 200.0f; 
 
@@ -310,9 +310,10 @@ void Mesh::UpdateChunkLODs(Camera& camera){
 	size_t end = std::min(start + chunkSize, instancePositions.size());
 	...
 	for (int i = start; i < end; ++i) {
-    // Perform frustum culling
-    if (isInside(instancePositions[i], camera)) {
-	...
+		// Perform frustum culling
+		if (isInside(instancePositions[i], camera)) {
+			...
+		}
 	}
 	highDetailStagingPositions.insert(highDetailStagingPositions.end(), threadHighDetailPositions.begin(), threadHighDetailPositions.end());
     ...
