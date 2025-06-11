@@ -119,9 +119,7 @@ where k is kinda similar to $\alpha$ (ROUGHNESS) but with some standard changes 
 $$
 \begin{align*}
 k_{direct} = \frac{(\alpha +1)^2}{8}
-\end{align*}
 \\
-\begin{align*}
 k_{IBL} = \frac{\alpha^2}{2}
 \end{align*}
 $$
