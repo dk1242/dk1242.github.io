@@ -13,7 +13,12 @@ Surfaces at a microscopic level are made of many tiny reflective mirrors called 
 So, on rougher surfaces, the incoming light rays will scatter in different random directions, resulting in widespread reflection. While for smooth surfaces, it will be a small and sharp reflection. 
 
 It can also be understood using halfway vector, *h*, which is just in between light *l* and view *v* vector.
-![Halfway Vector](/assets/images/halfwayVector.png)
+
+<!-- ![Halfway Vector](/assets/images/halfwayVector.png) -->
+<div style="text-align: center;">
+  <img src="/assets/images/halfwayVector.png" alt="Halfway Vector" style="width: 100%; max-width: 500px; height: auto;"/>
+</div>
+<br/>
 So, more the number of microfacets aligned to the halfway vector, the sharper and stronger reflection will be there and vice versa.
 
 ## Energy conservation 
@@ -53,6 +58,7 @@ f_r = k_d.f_{lambert} + k_s.f_{cookTorrance}
 $$
 
 Here $k_d$ is ratio of light that gets refracted while $k_s$ is the ratio that gets reflected. $f_{lambert}$ is the **Lambertian Diffuse** which is a constant denoted as:
+
 $$
 \begin{align*}
 f_{lambert} = \frac{c}{\pi}
@@ -78,6 +84,7 @@ $$
 NDF_{GGXTR}(n, h, \alpha) = \frac{\alpha^2}{\pi ((\mathbf{n} \cdot \mathbf{h})^2 (\alpha^2 - 1) + 1)^2}
 \end{align*}
 $$
+
 where $h$ is halfway vector and $\alpha$ is surface roughness.
 
 In GLSL, we can convert this function as follows:
@@ -97,7 +104,7 @@ float DistributionGGX(vec3 N, vec3 H, float ROUGHNESS)
     return num / denom;
 }
 ```
-
+<br/>
 $G$ is <ins>**Geometry function**</ins>, which calculates how many microfacets are visible from both the view and light directions as sometimes due to roughness some microfacets blocks other microfacets to reflect the light. We will again use a very standard function, Smith's Schlick-GGX to calculate it.
 
 $$
@@ -105,11 +112,14 @@ $$
 G_{SchlickGGX}(n, v, k) = \frac{n \cdot v}{(n \cdot v) (1 - k)+k}
 \end{align*}
 $$
+
 where k is kinda similar to $\alpha$ (ROUGHNESS) but with some standard changes depending on direct or IBL based lighting:
 
 $$
 \begin{align*}
 k_{direct} = \frac{(\alpha +1)^2}{8}
+\\
+k_{IBL} = \frac{\alpha^2}{2}
 \end{align*}
 $$
 
@@ -148,7 +158,7 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float ROUGHNESS)
     return ggx1 * ggx2;
 }
 ```
-
+<br/>
 $F$ is <ins>**Fresnel equation**</ins>, which tells the ratio of amount of light which gets reflected versus the amount that gets refracted. It also varies over the angle we are looking at that surface. We can denote it using Fresnel-Schlick approximation:
 
 $$
@@ -156,6 +166,7 @@ $$
 F_{Schlick}(h,v,F_0) = F_0 + (1 - F_0)(1-(h\cdot v))^5
 \end{align*}
 $$
+
 where $F_0$ is base reflectivity. As many game engines have adopted 0.04 as a standard for dielectrics, we will also take $F_0$ as 0.04.
 
 In GLSL, we will implement it as following:
@@ -173,8 +184,10 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 ```
-
+<br/>
 So, thats how we can implement Cook-Torrance BRDF in our fragment shader code. But now we have to integrated it first with direct lighting and then with IBL.
+
+
 <script>
 window.MathJax = {
   tex: {
