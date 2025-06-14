@@ -17,7 +17,7 @@ IBL considers whole environment lighting not just the direct lighting, which mak
 
 With an environment cubemap, we can visualize each texel (texture pixel) as one single light source and by sampling this cubemap with `texture()` for the direction $\omega_i$, we can get scene's radiance from that direction.
 ```GLSL
-vec3 radiance = texture(skybox, R).rgb;
+vec3 radiance = texture(cubemap, w_i).rgb;
 ```
 We have to do this smapling for all possible directions $\omega_i$ across the hemisphere $\Omega$ which will become very expensive with each fragment shader call. We can try with precomputing most of the required calculations to solve this integral efficiently.
 
@@ -336,3 +336,139 @@ It should render like a skybox with continous looking environment.
 So, we are done with generating a cubemap from a HDR image and its rendering in our application. Now we have to generate the pre discussed Irradiance map.
 
 ### Irradiance Map
+Now we have environmant cubemap and we can sample it for a particular direction $\omega_i$ to calculate the radiance $L(p, \omega_i)$. But now we have to face the real challange of solving the integral for all possible incoming directions.
+
+As we have already discussed, we will precompute and store most of our required calculations in an irradiance map. We can then obtain the radiance value by sampling the irradiance map over the fragment surface oriented around its surface normal.
+```GLSL
+vec3 irradiance = texture(irradianceMap, N).rgb;
+```
+As we already know, to generate the irradianceMap, we need to convolute the environment lighting coverted to cubeMap. The surface hemisphere is oriented toward normal, so convoluting the cube map equals calculating the total averaged radiance of each direction $\omega_i$ in  the hemisphere $\Omega$ oriented along $N$.
+
+Same as before, we will start with writing vertex and fragment shaders which will support in convolution and genrating the Irradiance Map. For vertex shader, if you want you can use the previous cubeMapShader.vert file or create a new irradianceShader.vert file with the same content.
+
+Befor we start writing the fragment shader code we need to understand how we are going to perform covolution. Our solid angle $dw$ will be defined on the basis of the number of segments in the hemisphere $\Omega$. To use it we need to convert it into its equivalent spherical coordinates $sin(\theta) d\theta d\phi$. You can understand this conversion from the [Spheres](https://dk1242.github.io/2025/05/23/Rendering-1M-spheres-3-Spheres.html#:~:text=the%20following%20image.-,Sphere,-Next%20we%20need) section of the [Circle, Sphere and Spheres blog](https://dk1242.github.io/2025/05/23/Rendering-1M-spheres-3-Spheres.html).
+![Sphere Vertex](/assets/images//sphereVertex.png)
+We can assume our $d\omega$ have $d\theta$ height and width of $sin(\theta)d\phi$ ($sin(\theta)$ swiped for $d\phi$). The area it will cover will be $sin(\theta)d\phi \times d\theta $ which is equal to the solid angle $d\omega$.
+
+This way we can rewrite our reflectance equation in terms of $\theta$ and $\phi$.
+
+$$
+\begin{align*}
+L_o(p, \phi_o, \theta_o) = k_d \frac{c}{\pi} \int_{\phi = 0}^{2\pi}\int_{\theta = 0}^{\frac{\pi}{2}} L_i(p, \phi_i, \theta_i) cos(\theta)sin(\theta)d\phi d\theta 
+\end{align*}
+$$
+
+Now we can write our fragment shader with keeping the above method in mind.
+```GLSL
+#version 330 core
+out vec4 FragColor;
+in vec3 localPos;
+
+uniform samplerCube environmentMap;
+
+const float PI = 3.14159265359;
+
+void main()
+{		
+    vec3 N = normalize(localPos); // normal for hemisphere's orientation 
+  
+    vec3 irradiance = vec3(0.0);
+
+    vec3 up    = vec3(0.0, 1.0, 0.0); // Up vector
+    vec3 right = normalize(cross(up, normal)); // right Direction vector
+    up         = normalize(cross(N, right));
+
+    float sampleDelta = 0.025;
+    float sampleCount = 0;
+    for(float phi = 0.0; phi < 2.0*PI; phi+=sampleDelta){
+        for(float theta = 0.0; theta < 0.5*PI; theta+=sampleDelta){
+            // spherical to cartesian coordinates in tangent space 
+            vec3 tangentSample = vec3(sin(theta) * cos(phi),  sin(theta) * sin(phi), cos(theta));
+            // tangent space to world space coordinates
+            vec3 sampleVec = tangentSample.x * right + tangentSample.y * up + tangentSample.z * N; 
+            // sample the envMap and add it to irradiance
+            irradiance += texture(environmentMap, sampleVec).rgb * cos(theta) * sin(theta); // cos(theta) to account that light becomes weaker at larger angles & sin(theta) accounts smaller sample areas in higher hemisphere areas.
+            sampleCount++;
+        }
+    }
+    irradiance = irradiance * (PI / float(sampleCount)); // Normalize by sample count
+
+    FragColor = vec4(irradiance, 1.0); // Output irradiance
+}
+```
+Now we'll create another shaderClass object for irradianceShader and will call generateIrradianceMap with this shader and previously generated cubemap texture.
+```cpp
+Shader irradianceShader("./irradianceShader.vert", "./irradianceShader.frag", "irradiancemap");
+irradianceShader.Activate();
+...
+GLuint irradianceMap = textureUtilitiesObject.GenerateIrradianceMap(cubemapTexture, irradianceShader);
+glViewport(0, 0, WIDTH, HEIGHT);
+```
+We will implment the `GenerateIrradianceMap()` in very same way as `GenerateCubeMap()` just with some differences which I'll highlight in the code comments.
+```cpp
+GLuint TextureUtilities::GenerateIrradianceMap(GLuint& cubemapTexture, Shader& irradianceShader)
+{
+    GLuint irradianceMap;
+    glGenTextures(1, &irradianceMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap); // GL_TEXTURE_CUBE_MAP same as GenerateCubeMap()
+
+    for (GLuint i = 0; i < 6; ++i) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr); // Notice the difference in size (32 x 32) as irradiance map will not have high frequency details because of the averaging of sorrounding radiance
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    ... 
+
+    GLuint captureFBO, captureRBO;
+    glGenFramebuffers(1, &captureFBO);
+    glGenRenderbuffers(1, &captureRBO);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32); // again storing the map at lower resolution
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "Framebuffer is not complete!" << std::endl;
+        return 0; // Return an invalid texture
+    }
+
+    glViewport(0, 0, 32, 32); // resize the viewport to capture all dimensions
+
+    // Activate the irradiance shader
+    irradianceShader.Activate(); // shader with convolution calculations
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture); // Bind the input cubemap texture
+    glUniform1i(glGetUniformLocation(irradianceShader.ID, "environmentMap"), 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    
+    for (GLuint i = 0; i < 6; ++i) {
+        glUniformMatrix4fv(glGetUniformLocation(irradianceShader.ID, "camMatrix"), 1, GL_FALSE, glm::value_ptr(cameraMatrix[i]));
+
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        skymap->Draw(irradianceShader);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return irradianceMap;
+}
+```
+It should generate the irradiance map like following:
+![Irradiance Map](/assets/images/irradianceMap.png)
+
+## PBR and diffuse IBL
+
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
