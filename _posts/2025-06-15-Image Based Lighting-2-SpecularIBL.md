@@ -348,7 +348,11 @@ GLuint TextureUtilities::GenerateBRDFLUT(Shader& brdfShader)
 ```
 It should produce a new texture like this.
 
-![BRDF LUT texture](/assets/images/brdf.png)
+<!-- ![](/assets/images/brdf.png) -->
+<div style="text-align: center;">
+  <img src="/assets/images/brdf.png" alt="BRDF LUT texture" style="width: 100%; max-width: 512px; height: auto;"/>
+</div>
+<br/>
 
 ## Completing the specular IBL part of PBR shader
 We will pass both prefilteredEnvMap and brdfLUT map to the shader with uniforms. To get the specular reflections of the surface, we will sample the prefilteredEnvMap using the reflection vector based on the surface roughness and mip level, giving rough surface a blurrier reflection. Then we will sample the BRDF LUT with roughness and the angle between N and V.
