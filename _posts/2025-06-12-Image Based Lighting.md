@@ -460,6 +460,42 @@ It should generate the irradiance map like following:
 ![Irradiance Map](/assets/images/irradianceMap.png)
 
 ## PBR and diffuse IBL
+Before we start for specular part of IBL, we should complete the integration of diffuse IBL with PBR in our pre existing shader code. As both of specular and diffuse IBL are part of indirect lighting, we can replace ambient lighting with this.
+
+We will start by passing our pre-generated irradiance map using `uniform` and then retrieve the irradiance values stored, by sampling it with as a texture around the surface normal. Then we'll use the Fresnel equation to weigh down the diffuse part of IBL. But here we don't have the halfway vector as we are considering all lights coming from all possible directions around the hemisphere. But we can fix this by using `ROUGHNESS` term as halfway vector was used to signify the roughness. And in last we will add in our final color.
+```GLSL
+...
+uniform samplerCube irradianceMap; // Diffuse irradiance
+...
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+...
+void main(){
+    ...
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, ROUGHNESS);
+
+    vec3 kS = F;
+    vec3 kD = 1.0 - kS;
+    kD *= 1.0 - METALNESS;
+
+    // DIFFUSE IBL
+    vec3 irradiance = texture(irradianceMap, N).rgb;
+    vec3 diffuseIBL = irradiance * Albedo;
+
+    // AMBIENT IBL
+    vec3 ambientIBL = (kD * diffuseIBL) * ao;
+    ...
+    vec3 color = ambientIBL;
+    ...
+    FragColor = vec4(color, 1.0);
+}
+```
+It should give output look like the following image:
+![Spheres with irradiance map](/assets/images/irradianceSpheres.png)
+I have disabled the direct lighting for this output. So we can undertand it better.
+
 
 <script>
 window.MathJax = {
