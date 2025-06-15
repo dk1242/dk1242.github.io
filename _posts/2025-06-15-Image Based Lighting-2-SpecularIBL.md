@@ -182,6 +182,7 @@ GLuint TextureUtilities::GeneratePrefilteredCubemap(GLuint& cubemapTexture, Shad
 }
 ```
 It will produce output like following. I have not yet explained how we will integarte it with our main fragment shader but as I have already written that part, I'm showing this output.
+
 ![Prefilter Map output](/assets/images/prefilterOutput.png)
 
 ## BRDF Integration map
@@ -345,7 +346,8 @@ GLuint TextureUtilities::GenerateBRDFLUT(Shader& brdfShader)
     return brdfLUTTexture;
 }
 ```
-It should produce a new texture like this:
+It should produce a new texture like this.
+
 ![BRDF LUT texture](/assets/images/brdf.png)
 
 ## Completing the specular IBL part of PBR shader
@@ -370,6 +372,7 @@ color = pow(color, vec3(1.0/2.2));
 FragColor = vec4(color, 1.0);
 ```
 This is producing an output like this which fully implements and visulaizes **Physically Based Rendering (PBR) with direct lighting and Image Based Lighting (IBL)**.
+
 ![PBR And IBL final Output](/assets/images/finalOutput.png)
 
 Here, we are done with our target of rendering **1 Million spheres with dynamic lighting and Physically Based Rendering while maintaing 60fps on the screen**.
