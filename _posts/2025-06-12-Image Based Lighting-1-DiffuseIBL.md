@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Image Based Lighting"
+title:  "Image Based Lighting: Part 1 (Diffuse IBL)"
 date:   2025-06-12
 ---
 Image Based Lighting is a technique used in computer graphics and rendering to light objects using the information from the images forming a sorrounding environment as one big light source. IBL uses an image, usually a high dynamic range image (HDRI) or a cubemap environment image, captured from real world to simulate realistic lighting environment.
@@ -496,6 +496,7 @@ It should give output look like the following image:
 ![Spheres with irradiance map](/assets/images/irradianceSpheres.png)
 I have disabled the direct lighting for this output. So we can undertand it better.
 
+Now we are left with the specular part of IBL, which I will complete in the next blog because this one has already crossed a good length.
 
 <script>
 window.MathJax = {
