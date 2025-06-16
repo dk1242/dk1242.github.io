@@ -379,6 +379,10 @@ This is producing an output like this which fully implements and visulaizes **Ph
 
 ![PBR And IBL final Output](/assets/images/finalOutput.png)
 
+If we add the input Albedo color too, it will look like this.
+
+![PBR & IBL with input Albedo](/assets/images/finalOutputWithColor.png)
+
 Here, we are done with our target of rendering **1 Million spheres with dynamic lighting and Physically Based Rendering while maintaing 60fps on the screen**.
 
 <script>
