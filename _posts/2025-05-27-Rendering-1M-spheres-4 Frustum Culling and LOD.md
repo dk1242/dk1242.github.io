@@ -6,21 +6,21 @@ date:   2025-05-27
 In this blog, we will go through the 2 most important and standard optimizations methods including Frustum Culling and Level of Detail.
 
 # Frustum Culling
-Frustum culling is an optimization technique which can improve the rendering performance by excluding the objects outside the camera's viewing frustum from the rendering pipeline.
-The camera's viewing frustum depends on the type of camera, we are using. As we are using a perspective camera, frustum should also be of perspective type. But there's one issue with perspective frustum here that when we move our camera, it will remove and include the spheres in between the movement which doesn't look good.
+Frustum culling is an optimization technique that can improve the rendering performance by excluding the objects outside the camera's viewing frustum from the rendering pipeline.
+The camera's viewing frustum depends on the type of camera we are using. As we are using a perspective camera, frustum should also be of perspective type. But there is one issue that when the camera moves, spheres are dynamically removed or included during the movement, which can result in a bad visual experience.
 
 ![Perspective frustum](/assets/images/perspective_frustum_working.png)
 
-It'll be good if these spheres will get added and removed at the near and far plane only, which will produce a much better experience. We can produce this effect using **an orthographic type frustum while using a perpspective camera**. 
+It'll look good if these spheres will get added and removed at the near and far plane only, which will produce a much better visual experience. We can produce this effect using **an orthographic-type frustum while using a perspective camera**. 
 
 ![Orthographic frustum](/assets/images/orthographic_frustum_working.png)
 
 ### Orthographic Frustum
-Before we start doing frustum culling, we first have to calculate the frustum planes positions. As we already have defined the near and far plane distance for camera, our frustum depth will be (far - near). 
+Before performing frustum culling, we need to calculate the positions of the frustum planes. As we already have defined the near and far plane distance for camera, our frustum depth will be (far - near). 
 
 <!-- ![Orthographic Frustum Calculation](/assets/images/orthographic_frustum_calculation.png) -->
 
-We can define frustum Width and depth based on our scene. The minimum value we should assign for frustum depth is 150.0f because our spheres are spread from -150 to +150 in z direction. For frustum width too, we should assign it atleast 150.0f.
+We can define frustum Width and depth based on our scene. The minimum value we should assign for the frustum depth is 150.0f because our spheres are spread from -150 to +150 along the z-axis. For frustum width too, we should assign it at least 150.0f.
 We will calculate frustum height using the aspect ratio we have defined for our screen.
 ```cpp
 void Camera::UpdateFrustum() {
@@ -40,7 +40,7 @@ void Camera::UpdateFrustum() {
 ```
 We will call `updateFrustum()` inside `updateMatrix()` after calculating the cameraMatrix in our rendering loop. 
 
-After this we need to check if a sphere is lying inside or outside our frustum. For this, we will just check that our sphere center as a point is inside all 6 frustum planes or not.
+After this we need to check if a sphere is lying inside or outside our frustum. For this, we will just check that our sphere's center as a point is inside all 6 frustum planes or not.
 ```cpp
 static bool isInside(const glm::vec3& position, Camera& camera) {
     return position.x >= camera.left && position.x <= camera.right &&
@@ -48,7 +48,7 @@ static bool isInside(const glm::vec3& position, Camera& camera) {
         position.z <= camera.near && position.z >= camera.far;
 }
 ```
-We will also need one separate funtion which will call isInside() for all instancePositions and if inside, it will push to culledPositions vector. Then we will use this `culledPositions.size()` instead of `numInstances`. 
+We will also need one separate funtion which will call isInside() for all instancePositions and if inside, it will push to culledPositions vector. So, we will use this `culledPositions.size()` instead of `numInstances`. 
 ```cpp
 void Mesh::doCulling(Camera& camera){
 	for (size_t i = 0; i < instancePositions.size(); i++){
@@ -69,11 +69,11 @@ Now, try to increase the numInstances value, start from at least 100k where scre
 For me till 175k spheres, it's rendering with ~60fps
 
 # Level of Detail (LOD)
-Level of Detail is a technique we use to optimize the rendering performance by dynamically changing the complexity of our 3d Models based on their distance from the camera. So, the closer an object is to the viewer, higher the details of that model and vice versa.
+Level of Detail is a technique used to optimize rendering performance by dynamically adjusting the complexity of 3D models based on their distance from the camera. The closer an object is to the viewer, the higher the detail of the model, and vice versa.
 
-In our application, we can implement this by dividing our frustum depth in 3 parts based on the distance from the camera. The first part which is nearest to our camera will have the spheres with the highest number of vertices, then the middle with medium number of vertices and the last section with the lowest number of vertices. 
-Implementing LOD will improve the performance as there will be reduction in computations inside GPU (less number of vertices to run vertex and fragment shader code).
-We will generate vertices in 3 different vectors for LOD and the corresponding indices too in the same way. Inside Mesh class we will need a different constructor which will assign 3 different VAOs for LOD.
+In our application, we can implement this by dividing the frustum depth into three parts based on the distance from the camera. The first part, nearest to the camera, will contain spheres with the highest vertex count, the middle section will have spheres with a medium vertex count, and the last part will include spheres with the lowest vertex count. 
+Implementing LOD improves performance by reducing computations on the GPU (fewer vertices to process in the vertex and fragment shaders).
+We will generate vertices in three separate vectors for LOD and their corresponding indices in the same manner. Within the Mesh class, a new constructor will be required to assign three distinct VAOs for LOD.
 ```cpp
 // main.cpp 
 std::vector<glm::vec3> highDetailVertices;
@@ -85,15 +85,15 @@ std::vector<GLuint> mediumDetailIndices;
 std::vector<glm::vec3> lowDetailVertices;
 std::vector<GLuint> lowDetailIndices;
 
-// control the segments values based on your system specs, for me the grpahic quality was good with following segment values
+// change the segments value based on your system specs, for me the graphic quality was good with following segment values
 const int highDetailLatSegments = 30;
 const int highDetailLonSegments = 30;
 
 const int mediumDetailLatSegments = 25;
 const int mediumDetailLonSegments = 25;
 
-const int lowDetailLatSegments = 5; // we can drop it to 5 because they looks very small on the screen and don't need very high details
-const int lowDetailLonSegments = 5;
+const int lowDetailLatSegments = 8; // we can drop it to 8 because they will look very small on the screen and don't need much detailing
+const int lowDetailLonSegments = 8;
 
 for (int i = 0; i <= highDetailLatSegments; ++i) {
 	float theta = i * 3.14159265359f / highDetailLatSegments;
@@ -143,11 +143,11 @@ Mesh::Mesh(std::vector<glm::vec3>& highVertices, std::vector<GLuint>& highIndice
 	highVBO.Unbind();
 
 	...
-	// repeat for other medium and low 
+	// repeat for medium and low LOD
 	...
 }
 ```
-We also need 3 different instancePositions vector based on the LOD, which we will update after calculating the culledPositions value. For now, we have divided our frustum depth (which is 150 units) in 3 parts (50 units for each LOD).
+We'll also need 3 different instancePositions vector based on the LOD, which we will update after calculating the culledPositions value. For now, we have divided our frustum depth (which is 150 units) in 3 parts (50 units for each LOD).
 ```cpp
 for (size_t i = 0; i < culledPositions.size(); i++) {
 	float distance = glm::length(camera.Position - culledPositions[i]);
@@ -163,8 +163,8 @@ for (size_t i = 0; i < culledPositions.size(); i++) {
 	}
 }
 ```
-Now, for drawing the spheres we need different LODs Instance Positions which we can pass through different draw calls. Here, we just have 3 LODs, so, with 3 draw calls instead of 1, it will not cause a significant drop in our rendering performance.
-Inside our Draw function, we will create 3 instance VBO for 3 different LODs and call the `glDrawElementsInstanced` with the current LOD instancePositions size.
+To draw the spheres now, we need different LOD instance positions, which can be passed through separate draw calls. Since we only have three LODs, using three draw calls instead of one will not significantly impact the rendering performance
+Inside our Draw function, we will create three instance VBOs for three different LODs and call `glDrawElementsInstanced` with the size of the current LOD instance positions.
 ```cpp
 void Mesh::Draw(...){
 	...
@@ -200,10 +200,10 @@ void Mesh::Draw(...){
 	}
 }
 ```
-Now try to increase the `numInstances` value and check the screen refresh rate. For me till 200k, it gave me ~60fps.
+Now try to increase the `numInstances` value and check the screen refresh rate. For me till 200k, I got approximately 60 fps.
 
 ### Instance VBOs restructuring
-There is one more simple optimization we can do that instead of creating Instance VBO with every draw call, we can create it once with *initializeInstanceVBOs()*, which we will call just before entering the rendring loop. Then update these instance VBOs in each draw call. 
+There is one more simple optimization we can do where instead of creating an Instance VBO with each draw call, we can create it once using *initializeInstanceVBOs()*, which we will call just before entering the rendring loop and then just update these Instance VBOs during each draw call.
 ```cpp
 // In Mesh.h
 InstanceVBO *highPosVBO, *medPosVBO...;
@@ -254,16 +254,16 @@ void InstanceVBO::Update(std::vector<glm::vec3>& instanceProps)
 	glBufferSubData(GL_ARRAY_BUFFER, 0, instanceProps.size() * sizeof(glm::vec3), instanceProps.data());
 }
 ```
-Now, if you have observed we have combined Frustum culling and LOD selection in a single loop, which also have given some performance improvement because we removed the culledPosition.push_back(pos) which can save some time for us.
+Now, as you may have observed, we have combined frustum culling and LOD selection into a single loop, which has provided some performance improvement because we removed the culledPosition.push_back(pos), which helped in saving some processing time.
 
-Till this point, I got 250k~260k spheres rendering easily with 60fps.
+Up to this point, I achieved 250k to 260k spheres rendering smoothly at 60 fps.
 
-## Parallel threads calculation
-The next approach we can directly implement is to use threads and do these calculations parallely. However, while it sounds straightforward and simple but it is not as it seems. One of the major challenge is thread synchronization, which can become a significant bottleneck in performance when using threads. Synchronization introduces overhead, which can significantly impact performance. As the number of threads increases, the amount of synchronization required also grows. After a point, adding more threads does not improve performance and may even degrade it due to the increased complexity of coordination.
+## Parallel threads calculations
+The next approach we can directly implement is to use threads and do these calculations parallely. While it may sound straightforward, implementing thread-based calculations is more complex than it seems. One of the major challenges is thread synchronization, which can become a significant performance bottleneck when using threads. Synchronization introduces overhead, which can significantly impact performance and it increases with the number of threads. After a point, adding more threads does not improve performance and may even degrade it due to the increased complexity of coordination.
 
-To address this, we need to limit the number of threads which can run parallely and optimize our performance. In my case, after experimenting with different thread counts, I found that setting the number of threads to 4 resulted in improved performance. Other thread counts, whether higher or lower, led to a decline in performance due to either underutilization or excessive synchronization.
+To address this, we need to limit the number of threads which can run parallely and optimize our performance. After experimenting with various thread counts, I found that using four threads provided optimal performance. Using higher or lower thread counts led to degraded performance, either due to underutilization or increased synchronization overhead.
 
-I used "<omp.h>" for threads implementation as it was easy to implement without caring for mutex lock and all. I also used private thread local buffers for push_back() and later we combined it with actual buffers to avoid any dirty write. 
+I used "<omp.h>" for threads implementation because it simplifies the process by eliminating the need to manually manage mutex locks. I used private thread-local buffers for push_back() operations, which were later merged with the main buffers to prevent dirty writes. 
 ```cpp
 void updateCullingLOD(Camera& camera){
 	omp_set_num_threads(4); // thread count 4 gave best results to me
@@ -287,12 +287,12 @@ void updateCullingLOD(Camera& camera){
 	}
 }
 ```
-Again we didn't got the expected amount of performance, just an addition of 50k spheres. At this point, I got 60fps for around 300k spheres.
+Again, we did not achieve the expected level of performance, only an additional 50k spheres. At this point, I achieved 60 fps with approximately 300k spheres.
 
-Now I understood the main bottleneck in the cpu side was the updateCullingLOD() where we were doing the 1 Million calculation and handling all those push_back() and everything in one go. Even though it was done parallely by 4 threads but not much improvement in the performance. So, we had to reduce this number for a single call.
+Now I understood the main bottleneck on the CPU side was the `updateCullingLOD()` function which involved performing one million calculations and handling numerous push_back() operations in a single execution. Although it was executed in parallel using four threads, it resulted in minimal performance improvement. So, we had to reduce this number for a single call.
 
-### Calculation in chunks (Not a perfect solution but visually no difference)
-I tried doing this calculation in chunks like we divide our data in 10 chunks and in each rendering loop we will run updateCullingLOD for 100k and the starting position of loop will offset everytime. When we will complete all chunks calculations, then only we will update the main vectors: highInstancePositions, medInstancePositions and lowInstancePositions. We can implement this by defining the start and end point in our for-loop and also keeping separate staging vectors and then aggregate them when all chunks calculation gets completed.
+### Chunk-Based Calculations (Not Perfect, but Visually Indistinguishable)
+I attempted chunk-based calculations by dividing the data into n (<=10) chunks. In each rendering loop, the updateCullingLOD() function will process n-hundred thousand (>=100k) instances and the starting position of loop will offset during each iteration. After completing all chunk calculations, the main vectors will be updated: highInstancePositions, medInstancePositions and lowInstancePositions. It can be implemented by defining the start and end points in the for-loop, maintaining separate staging vectors, and aggregating them once all chunk calculations are completed.
 ```cpp
 // In Mesh.h
 const size_t numChunks = 10; // we will try to reduce it
@@ -336,8 +336,8 @@ void Mesh::AggregateBuffers()
     ...
 }
 ```
-Here we got **60 fps for 1000000 spheres** and I can reduce numChunks to 5 too and it's still giving same performance. So, here we are processing 200k spheres in a go and after every 5 cyles we are also updating our data, which is really giving very good visual result and you can never identify that you are seeing **a little old data for some fractions of seconds**. 
+Here, we achieved **60 fps for 1,000,000 spheres** and I reduced numChunks to 5, and it still maintained the same performance. So, here we are processing 200k spheres in a go and after every five cycles, we update our data, which produces excellent visual results and it is virtually unnoticeable that you are viewing **slightly outdated data for mere fractions of a second**. 
 
-Even though it doesn't produce any wrong visual output, we still have to fix it. After doing some research, I found we can do this Culling and LOD selection calculation in GPU which will give a major performance boost becuase GPU can do these calculation parallely with their thousand of cores designed specifically for parallel processing. **GPUs also have higher memory bandwidth so we can directly store data in GPU and process them too very fast**.
+Although this approach does not produce incorrect visual output, still we have to fix it. After doing further research, I found that culling and LOD selection calculations can be performed on the GPU which can provide a significant performance boost, as GPUs are equipped with thousands of cores optimized for parallel processing. **GPUs also have higher memory bandwidth, allowing data to be stored directly on the GPU and processed much faster**.
 
-I will complete the implementation of **Culling and LOD selection in GPU** in our next blog.
+In the next blog, I will detail the implementation of **culling and LOD selection on the GPU**".

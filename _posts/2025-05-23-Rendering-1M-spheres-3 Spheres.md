@@ -11,7 +11,7 @@ Before we start with spheres, I want to show how we can draw a circle. The easie
   <img src="/assets/images/circle_with_triangle.png" alt="Circle With Triangles" style="width: 100%; max-width: 720px; height: auto;"/>
 </div>
 <br/>
-To arrange these triangles in such a manner that it will form a circle, we need to find the vertex positions accordingly. We will use mathematical equations to find them. If we plot our 2D circle on a XY plane, any point on the perimeter of circle can be calculated using some trigonometry.
+To arrange these triangles in such a manner that it will form a circle, we need to find the vertex positions accordingly. We will use mathematical equations to find them. If we plot our 2D circle on a XY plane, any point on the perimeter of circle can be calculated using some basic trigonometry.
 
 ![Circle Vertex calculation](/assets/images/circlevertex.png)
 
@@ -50,7 +50,7 @@ circleInd.push_back(1);           // Closing the circle
 
 Mesh circle(circleVertices, circleInd);
 ```
-Before we start drawing we also need to create a simple Model matrix for the circle and assign it in shader uniform, so it can interact properly with the camera. 
+Before we start drawing it, we'll also need to create a simple Model matrix for the circle and assign it in shader uniform, so it can interact properly with the camera. 
 ```cpp
 glm::vec3 circlePos = glm::vec3(0.0f, 0.0f, 0.0f);
 glm::mat4 circleModel = glm::mat4(1.0f); // an Indentity matrix with no translations, no rotations and no scaling 
@@ -66,14 +66,14 @@ Now just call `circle.Draw(shader, camera)` inside rendering loop and run your a
 <br/>
 
 ## Sphere
-Next we need to render a Sphere. We will follow the same steps as above. First we need to figure out how to calculate the vertex positions and then how to arrange them so that the triangles form a spherical surface. 
+Next we need to render a Sphere. We will follow the same steps as above. But first we need to figure out how to calculate the vertex positions and then how to arrange them so that the triangles will form a spherical surface. 
 Before we start, I want to clarify that we are going to draw triangles over the surface only, not inside. It will be a hollow sphere with triangles covering its surface.
 
 We can calculate the vertices by visualizing a sphere in the following way.
 
 ![Sphere Vertex Calculation](/assets/images/sphereVertex.png)
 
-In the above image, first, assume there is a line from the center to a vertex point. Now, $\theta$ is the angle between y-axis and that virtual line. So, the y-value for that vertex will be $r.cos(\theta)$. Then, if we draw the $sin(\theta)$ component of that line - it will lie on the xz-plane and $\phi$ will be the angle between this line and z-axis.
+In the above image, first assume there is a line from the center to a vertex point. Now, $\theta$ is the angle between y-axis and that virtual line. So, the y-value for that vertex will be $r.cos(\theta)$. Then, if we draw the $sin(\theta)$ component of that line - it will lie on the xz-plane and $\phi$ will be the angle between this line and z-axis.
 So, the z-value will be $r.sin(\theta).cos(\phi)$ and the x-value will be $r.sin(\theta).sin(\phi)$.
 
 $$
@@ -136,7 +136,7 @@ glUniformMatrix4fv(glGetUniformLocation(shaderProgram.ID, "model"), 1, GL_FALSE,
 sphere.Draw(shaderProgram, camera);
 ```
 
-Now, we are done with rendering a sphere but you may not be able to recognize it as a sphere because we have not enabled normals and lighting yet. So, to visualize it enable `glPolygonMode`, which will draw the triangle without filling them with colors.
+Now, we are done with rendering a sphere but you may not be able to recognize it as a sphere because we have not enabled normals and lighting yet. So, to visualize it enable `glPolygonMode`, which will just draw the triangle without filling them with colors.
 ```cpp
 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 ```
@@ -156,7 +156,7 @@ Mesh baseSphere(baseSphereVertices, baseSphereInd);
 spheres.push_back(baseSphere);
 ```
 Now, inside rendering loop, run another for loop to draw each sphere.
-This approach will work for some 1000s spheres but after that it will stop working smoothly, fps will drop and delayed update on screen. For my machine, it went well till some `1.5k` spheres and after that fps started dropping.
+This approach will work for some 1000s spheres but after that it will stop working smoothly and fps (from 60 fps) will drop with delayed update on screen. For my machine, it went well till some `1.5k` spheres and after that fps started dropping.
 
 So what's the next thing we can do to improve the performance with more number of spheres. We can use some direct and indirect methods like decreasing the data transfer between CPU and GPU, reducing the nummber of Draw calls to GPU.
 Currently inside our Draw() function, we are calling `glDrawElements` which draws a single sphere. So, when we call this Draw funtion for 1000 times, it calls 1000 draw calls to the GPU which is a very expensive operation. 
@@ -164,7 +164,7 @@ But OpenGL provides a very useful function `glDrawElementsInstanced`, which allo
 ```cpp
 glDrawElementsInstanced(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0, numInstances); // numInstances tells the number of times we want to draw a Mesh
 ```
-But before we can use it, we need to setup some things. Till now we were passing all of the vertices for each sphere to the GPU, instead of this we will pass the vertices of 1 sphere and then only pass the origin center of all other spheres and inside our shader code only we will calculate the position of the other sphere vertices by translating the baseSphere verticed to current sphere origin point. This way we will improve our performance as we have shifted our calculation part of sphere vertices to GPU which can run a million of calculations parallely. We also need to create a new Mesh Contructor with new InstanceVBO class, which is similar to VBO class. It will modularize our code and we need a different function for linking instance VBOs to our VAO. 
+But before we can use it, we need to setup some things. Till now we were passing all of the vertices for each sphere to the GPU, instead of this we will pass the vertices of 1 sphere and then only pass the origin center of all other spheres and inside our shader code only we will calculate the position of the other sphere vertices by translating the baseSphere vertices to current sphere origin point. This way we will improve our performance as we have shifted our calculation part of sphere vertices to GPU which can run thousands of calculations parallely. We also need to create a new Mesh Contructor with new InstanceVBO class, which is similar to VBO class. It will modularize our code and we need a different function for linking instance VBOs to our VAO. 
 ```cpp
 // VAO.cpp
 void VAO::LinkAttrib(InstanceVBO& instanceVBO, GLuint layout, GLuint numComponents, GLenum type, GLsizeiptr stride, void* offset) const
@@ -240,7 +240,7 @@ while(true){
 	...
 }
 ```
-Now you should be able to draw around 25000 spheres (~ 93 M vertices) while maintaining the 60fps.
+Now you should be able to draw around 25000 spheres (around 93 Million vertices) while maintaining the 60fps.
 
 As we are done for now, We learned how to draw a cirle, a sphere and a thousands of spheres.
 In the next article, we will cover more optimization methods including `Frustum Culling` and `Level of Detail`.
