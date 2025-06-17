@@ -3,9 +3,11 @@ layout: post
 title:  "Image Based Lighting: Part 1 (Diffuse IBL)"
 date:   2025-06-12
 ---
-Image Based Lighting is a technique used in computer graphics and rendering to light objects using the information from the images forming a sorrounding environment as one big light source. IBL uses an image, usually a high dynamic range image (HDRI) or a cubemap environment image, captured from real world to simulate realistic lighting environment.
+Image Based Lighting (IBL) is a technique used in computer graphics and rendering to light objects using information from images representing the surrounding environment as one big light source. IBL uses an image, usually a high dynamic range image (HDRI) or a cubemap environment texture, captured from the real world to simulate a realistic lighting environment.
 
-Before starting first take a look at reflactance equation.
+Imagine a reflective object placed outdoors. IBL simulates how the object interacts with the entire environment, including the sky, buildings, and other surrounding elements, creating realistic reflections and lighting effects.
+
+Before proceeding, let's take a look at reflectance equation.
 
 $$
 \begin{align*}
@@ -13,15 +15,16 @@ L_o(p, \omega_o) = \int_{\Omega} \left( k_d \frac{c}{\pi} + k_s \frac{DFG}{4(\om
 \end{align*}
 $$
 
-IBL considers whole environment lighting not just the direct lighting, which makes it possible for objects to look more physically accurate. But with this environment lighting when we have to do the calculation for radiance using reflectance equation, we need to calculate the integral with multiple incoming light directions becuase of potential radiance from all directions. While for direct lighting, we already knew the limited light positions and their respected directions which make it easier to calculate because of radiance from only one direction.
+IBL considers whole environment lighting rather than just direct lighting, which makes it possible for objects to appear more physically accurate. In the case of environment lighting, calculating radiance using the reflectance equation requires integrating it across all incoming light directions over the hemisphere above the surface because of potential radiance contributions from all possible directions. While for direct lighting, we already know the limited light positions and their corresponding directions which make it easier to calculate radiance as it originates from a single direction.
 
-With an environment cubemap, we can visualize each texel (texture pixel) as one single light source and by sampling this cubemap with `texture()` for the direction $\omega_i$, we can get scene's radiance from that direction.
+With an environment cubemap, each texel (texture pixel) can be visualized as one single light source. By sampling this cubemap with `texture()` for the direction $\omega_i$, we can get the scene's radiance from that direction.
+
 ```GLSL
 vec3 radiance = texture(cubemap, w_i).rgb;
 ```
-We have to do this smapling for all possible directions $\omega_i$ across the hemisphere $\Omega$ which will become very expensive with each fragment shader call. We can try with precomputing most of the required calculations to solve this integral efficiently.
+We have to do this sampling for all possible directions $\omega_i$ across the hemisphere $\Omega$ which can become computationally expensive for each fragment shader call. To solve this integral efficiently, we will precompute most of the required calculations.
 
-We can extend the reflectance equation in 2 parts for diffuse and specular IBL separately.
+The reflectance equation can be split into two separate components: diffuse and specular IBL.
 
 $$
 \begin{align*}
@@ -30,13 +33,13 @@ L_o(p, \omega_o) = \int_{\Omega} (k_d \frac{c}{\pi}) L_i(p, \omega_i) (n \cdot \
 $$
 
 ### Diffuse IBL
-In the integral for Diffuse IBL, we can move out the constant part $k_d\frac{c}{\pi}$ from the integration. For pre computation, we will assume our $p$ is always at the center of environment cubemap. It will give us an integral which totally depends on $\omega_i$. Now, we can compute a new cubemap which will store the result of diffuse integral for all possible outgoing directions $\omega_o$ using **convolution**.
+In the integral for Diffuse IBL, the constant term $k_d\frac{c}{\pi}$ can be factored out of the integration. For precomputation, we assume that the point $p$ is always at the center of the environment cubemap. This assumption gives us an integral which is totally dependent on $\omega_i$. Now, we can compute a new cubemap which will store the result of diffuse integral for all possible outgoing directions $\omega_o$ using **convolution**.
 
-**Convolution** involves calculating something for each entry in a dataset while factoring in contributions from all other entries within the dataset. Here, for every sample direction in the cubemap, we account for all other sample directions across the hemisphere $\Omega$. 
+**Convolution** involves performing calculations for each entry in a dataset while accounting for contributions from all other entries in the dataset. In this context, for every sample direction in the cubemap, we account for contributions from all other sample directions across the hemisphere $\Omega$. 
 
-To perform convolution on this environment cubemap, we will solve the integral for each output direction $\omega_o$ by sampling multiple incoming directions $\omega_i$. Then the radiance from these sampled directions will be averaged out. The hemisphere $\Omega$ used for sampling $\omega_i$ is always aligned with particular $\omega_o$ being convolved.
+To perform convolution on this environment cubemap, we will solve the integral for each output direction $\omega_o$ by sampling multiple incoming directions $\omega_i$. The radiance from these sampled directions is then averaged to compute the convolution result. The hemisphere $\Omega$ used for sampling $\omega_i$ is always aligned with the specific outgoing direction $\omega_o$ being convolved.
 
-This pre computed cubemap represents the sum of all indirect diffuse light from the scene that interacts with the surface aligned along the direction $\omega_o$. This type of cubemap is commonly reffered as an irradiance map, as it enables direct sampling of scene's irradiance for any direction $\omega_o$.
+This precomputed cubemap represents the sum of all indirect diffuse light from the scene that interacts with the surface aligned along the outgoing direction $\omega_o$. This type of cubemap is commonly reffered to as an irradiance map, as it enables direct sampling of scene's irradiance for any outgoing direction $\omega_o$.
 
 ### Cubemap
 For generating a cubemap, we can either go with a skybox which will have set of 6 images for 6 cube planes or a HDR image. But for implementing PBR, we must have to use HDR images because with normal LDR image skybox, it will have RGB values between 0.0 and 1.0 while HDR have color values outside 0.0 and 1.0 range to give lights with correct intensity.

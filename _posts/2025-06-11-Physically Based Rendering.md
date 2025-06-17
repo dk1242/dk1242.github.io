@@ -155,7 +155,7 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float ROUGHNESS)
 ```
 <br/>
 
-$F$ is <ins>**Fresnel equation**</ins>, which tells the ratio of amount of light which gets reflected versus the amount that gets refracted. It also varies over the angle we are looking at that surface. We can denote it using Fresnel-Schlick approximation:
+$F$ is <ins>**Fresnel equation**</ins>, which determines the ratio of light that gets reflected versus the amount that is refracted. It also varies over the angle at which we are viewing the surface. We can denote it using Fresnel-Schlick approximation:
 
 $$
 \begin{align*}
@@ -163,7 +163,7 @@ F_{Schlick}(h,v,F_0) = F_0 + (1 - F_0)(1-(h\cdot v))^5
 \end{align*}
 $$
 
-where $F_0$ is base reflectivity. As many game engines have adopted 0.04 as a standard for dielectrics, we will also take $F_0$ as 0.04.
+where $F_0$ represents the base reflectivity of the surface. Since many game engines use 0.04 as the standard base reflectivity value for dielectrics, we will also use $F_0 = 0.04$ in our implementation.
 
 In GLSL, we will implement it as following:
 ```GLSL
@@ -181,9 +181,9 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 }
 ```
 ### Radiance
-Now we have to calculate $L_i(p, \omega_i)$, which is the incoming radiance at point $p$ from direction $\omega_i$. It is determined by the light source's position, intensity and direction.
+Next, we have to calculate $L_i(p, \omega_i)$, which represents the incoming radiance at point $p$ from direction $\omega_i$. This radiance is determined by the light source's position, intensity and direction.
 
-In case of a direct lighting, we can say radiance function, $L_i(p, \omega_i)$ calculates light contribution at point $p$, taking into account light attenuation due to distance and relative angle between surface normal, $\mathbf{n}$ and incoming light direction $\omega_i$.
+For direct lighting, the radiance function, $L_i(p, \omega_i)$ calculates light contribution at point $p$, accounting for light attenuation due to distance and the relative angle between the surface normal $\mathbf{n}$ and incoming light direction $\omega_i$.
 
 We can integrate it in our fragment shader code as following:
 ```GLSL
@@ -201,7 +201,7 @@ void main(){
   ...
 }
 ```
-Finally we will combine all calculations of Cook-Torrance BRDF and add with *directLighting* as following:
+Finally, we combine the Cook-Torrance BRDF calculations with the direct lighting as follows:
 ```GLSL
 // Cook-Torrance BRDF
 float NDF = DistributionGGX(N, H, ROUGHNESS);
@@ -227,11 +227,17 @@ vec3 color = directLighting + ambient;
 ...
 FragColor = vec4(color, 1.0);
 ```
-Now you will be able to see the spheres with direct lighting and PBR enabled. It will look more realistic and physically based. As, I have 9 lights and they are moving in a circluar path with variable speed, you define the number of lights, their positions, colors and everything as you want. I'll just share the output I got.
+At this point, you should be able to see the spheres rendered with direct lighting and PBR enabled. It will look more realistic and physically accurate appearance. 
+
+For this setup, I have implemented nine lights moving in a circular path at variable speeds. You can define the number of lights, their positions, colors, and other properties as desired. 
+
+I will share the output I achieved with this setup.
 
 ![PBR with direct lighting](/assets/images/PBR_direct_lighting.png)
 
-So, we are done with PBR with direct lighting here. In next blog we will cover our last topic Image Based Lighting (IBL).
+With this, we have completed the implementation of PBR with direct lighting.
+
+In the next blog, we will cover Image Based Lighting (IBL), the final part of our implmentation.
 
 <script>
 window.MathJax = {
