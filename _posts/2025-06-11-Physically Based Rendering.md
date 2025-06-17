@@ -3,36 +3,36 @@ layout: post
 title:  "Physically Based Rendering"
 date:   2025-06-11
 ---
-Physically Based Rendering (PBR) is a rendering technique which aims to simulate the real world behavior of light to produce more realistic scene. It not only considers the light behavior but also the material properties like its metalness and roughness.
+Physically Based Rendering (PBR) is a rendering technique that aims to simulate the real-world behavior of light to create more realistic scene. It considers not only the behavior of light but also the material properties, such as metalness and roughness.
 
 # Core Principles of PBR
 
 ## Microfacet theory
-Surfaces at a microscopic level are made of many tiny reflective mirrors called as microfacets. The alignments of these tiny mirrors aka microfacets defines the roughness of a surface.
+Surfaces, at a microscopic level, are composed of many tiny reflective mirrors known as microfacets. Each microfacet reflects light according to its orientation, collectively determining the overall appearance of the surface. The alignments of these tiny mirrors aka microfacets, defines the roughness of a surface.
 
-So, on rougher surfaces, the incoming light rays will scatter in different random directions, resulting in widespread reflection. While for smooth surfaces, it will be a small and sharp reflection. 
+On rougher surfaces, incoming light rays scatter in random directions, resulting in diffuse, widespread reflections. While smooth surfaces produce small and sharp reflection. 
 
-It can also be understood using halfway vector, *h*, which is just in between light *l* and view *v* vector.
+This phenomenon can also be understood using halfway vector, *h*, which lies midway between between light vector, *l*, and view vector, *v*. The halfway vector is important in calculating specular reflections, as it represents the ideal orientation of microfacets for maximum reflection intensity.
 
 <!-- ![Halfway Vector](/assets/images/halfwayVector.png) -->
 <div style="text-align: center;">
   <img src="/assets/images/halfwayVector.png" alt="Halfway Vector" style="width: 100%; max-width: 500px; height: auto;"/>
 </div>
 <br/>
-So, more the number of microfacets aligned to the halfway vector, the sharper and stronger reflection will be there and vice versa.
+So, more the number of microfacets aligned to the halfway vector, the sharper and stronger the reflection will be, and vice versa.
 
 ## Energy conservation 
-If we think light as a form of energy here and when it gets pointed to a surface, the amount of light energy getting reflected should never exceed the amount of incoming light energy. Because the some amount of energy will get conserved by the surface.
+If we consider light as a form of energy, when it strikes a surface, the amount of reflected light energy should never exceed the amount of incoming light energy. Because the some amount of energy will get absorbed by the surface.
 
-The moment a light ray hits the surface, it gets divided into 2 parts, one which gets reflected known as specular light and the other which gets inside the surface (refracts) known as diffuse light. 
+The moment a light ray hits a surface, it splits into 2 components, one that gets reflected, known as specular light, and another that enters the surface (refracts) known as diffuse light. 
 
-Even though in real world, the refracted part of light ray not remains totally inside the object. It keeps getting collided with different parts of the object material until it looses its all energy. In this process, some part also gets reflected from different point of surface. For our case, we are assuming that all of the refracted amount of light will get absorbed completely. 
-As the reflected amount of energy will never enter again the surface unless reflected and direct back to the same surface, the energy left for refracted light is total minus the reflected light.
+In reality, the refracted portion of the light ray does not remain entirely inside the object. It continues to collide with various parts of the object's material until it loses all of its energy. During this process, some of the refracted light also gets reflected from different points on the surface. For simplicity, we assume that all refracted light is completely absorbed by the surface. 
+Since the reflected amount of energy will never re-enter the surface unless reflected and directed back to the same surface, the energy left for refracted light is the total incoming energy minus the reflected energy. This follows the principle of energy conservation, where the sum of reflected and refracted light energy equals the total incoming energy. In PBR, this balance is crucial for physically accurate shading models.
 
 ## Surface Interaction Type or BRDF
-Now we need to consider the type of surface which will decide how much each individual light ray will contribute to the final reflected light of the surface given its material properties. So if its a smooth surface, light will reflect based on viewing angle and for a rough surface it will scatter in different directions.
+We now need to consider the type of surface, which determines how each individual light ray contributes to the final reflected light, based on the surface's material properties. For smooth surfaces, light reflects primarily based on the viewing angle, whereas for rough surfaces, it scatters in multiple directions.
 
-But for its calculation, we need to know some standard PBR equation which we kinda use in the real world. This is known as **reflectance equation**:
+To calculate this, we rely on a standard PBR equation commonly used in real-world applications. This equation is known as the **reflectance equation**:
 
 $$
 \begin{align*}
@@ -40,16 +40,16 @@ L_o(p, \omega_o) = \int_{\Omega} f_r(p, \omega_i, \omega_o)\, L_i(p, \omega_i)\,
 \end{align*}
 $$
 
-To really understand PBR, we have to understand this equation truly.
+To really understand PBR, it is essential to understand this equation.
 
-This equation calculates the outgoing radiance (magnitude or strength of light) at a point $p$ in direction $\omega_o$. It integrates all the incoming light from all direction $\omega_i$ over the hemisphere $\Omega$ above the point $p$, including material's reflectance and surface orientations.
-* $f_r(p, \omega_i, \omega_o)$ is Bidirectional Reflectance Distribution Function (BRDF) which tells how much of the incoming light from direction $\omega_i$ is reflected toward $\omega_o$, depending on the material at $p$.
-* $L_i(p, \omega_i)$ is the incoming radiance at point $p$ from direction $\omega_i$.
-* $(\mathbf{n} \cdot \omega_i)$ is the dot product and cosine of the angle between surface normal $\mathbf{n}$ and incoming direction $\omega_i$. We consider it to follow the law that light is weaker the less it directly radiates onto the surface, and strongest when it is directly perpendicular to the surface. It scales the energy based on the light's incidence angle to the surface.
-* $d\omega_i$ is the very small solid angle, which will get integrated over the hemisphere.
+This equation calculates the outgoing radiance (magnitude or strength of light) at a point $p$ in direction $\omega_o$. It integrates all incoming light from every direction $\omega_i$ over the hemisphere $\Omega$ above the point $p$, including material's reflectance and surface orientations.
+* $f_r(p, \omega_i, \omega_o)$ is Bidirectional Reflectance Distribution Function (BRDF) which defines the proportion of incoming light from direction $\omega_i$ that is reflected toward direction $\omega_o$, depending on the material at $p$.
+* $L_i(p, \omega_i)$ is the incoming radiance at point $p$ from direction $\omega_i$, describing the intensity of light arriving at the surface.
+* $(\mathbf{n} \cdot \omega_i)$ is the dot product, which gives the cosine of the angle between surface normal $\mathbf{n}$ and incoming direction $\omega_i$. We consider it to follow the principle that light intensity is strongest when perpendicular to the surface and decreases as the angle becomes more oblique. It scales the energy based on the light's incidence angle to the surface.
+* $d\omega_i$ is a very small solid angle, which is integrated over the hemisphere $\Omega$ to account for contributions from all incoming light directions.
 
 ### Bidirectional Reflectance Distribution Function (BRDF)
-Bidirectional Reflectance Distribution Function (BRDF) is used for simulating the appearances of surfaces under lighting. For this application, we are going to use Cock-Torrance BRDF, which is well known and used in all real-time PBR pipelines. It incorporates specular reflection, diffuse reflection and fresnel effects:
+Bidirectional Reflectance Distribution Function (BRDF) is used to simulate the appearance of surfaces under lighting. For this application, we will use the Cook-Torrance BRDF, which is well known and commonly used in real-time PBR pipelines. It accounts for specular reflection, diffuse reflection, and Fresnel effects:
 
 $$
 \begin{align*}
@@ -65,9 +65,9 @@ f_{lambert} = \frac{c}{\pi}
 \end{align*}
 $$
 
-where $c$ is the surface Albedo (color). We divide it by $\pi$ to normalize as we already did integral over the hemisphere's solid angle.
+where $c$ represents the surface Albedo (color). We divide by $\pi$ to normalize the Lambertian diffuse term, as it accounts for the integral over the hemisphere's solid angle.
 
-The specular part of BRDF, $f_{cookTorrance}$ is defined as following:
+The specular component of the BRDF, $f_{cookTorrance}$ is defined as follows:
 
 $$
 \begin{align*}
@@ -77,7 +77,7 @@ $$
 
 Here,
 
-$D$ is a <ins>**Normal Distribution function**</ins> that calculates the amount of microfacets which are aligned to halfway vector. We will use a very standard NDF used by mutiple game engines for PBR, Trowbridge-Reitz GGX. It is expressed as:
+$D$ is a <ins>**Normal Distribution function**</ins> which calculates the proportion of microfacets aligned to the halfway vector. We will use a very standard NDF used by multiple game engines for PBR: Trowbridge-Reitz GGX. It is mathematically expressed as:
 
 $$
 \begin{align*}
@@ -85,9 +85,9 @@ NDF_{GGXTR}(n, h, \alpha) = \frac{\alpha^2}{\pi ((\mathbf{n} \cdot \mathbf{h})^2
 \end{align*}
 $$
 
-where $h$ is halfway vector and $\alpha$ is surface roughness.
+where $h$ represents the halfway vector and $\alpha$ denotes the surface roughness.
 
-In GLSL, we can convert this function as follows:
+In GLSL, we can implement this NDF as follows:
 ```GLSL
 // Distribution function: GGX
 float DistributionGGX(vec3 N, vec3 H, float ROUGHNESS)
@@ -106,7 +106,7 @@ float DistributionGGX(vec3 N, vec3 H, float ROUGHNESS)
 ```
 <br/>
 
-$G$ is <ins>**Geometry function**</ins>, which calculates how many microfacets are visible from both the view and light directions as sometimes due to roughness some microfacets blocks other microfacets to reflect the light. We will again use a very standard function, Smith's Schlick-GGX to calculate it.
+$G$ is <ins>**Geometry function**</ins>, which determines how many microfacets are visible from both the view and light directions as sometimes due to roughness some microfacets may block other microfacets, preventing them from reflecting the light. We will use Smith's Schlick-GGX Geometry Function, standard for calculating geometric occlusion in PBR.
 
 $$
 \begin{align*}
@@ -114,7 +114,7 @@ G_{SchlickGGX}(n, v, k) = \frac{n \cdot v}{(n \cdot v) (1 - k)+k}
 \end{align*}
 $$
 
-where k is kinda similar to $\alpha$ (ROUGHNESS) but with some standard changes depending on direct or IBL based lighting:
+where k is similar to $\alpha$ (ROUGHNESS) but with some standard changes depending on direct or Image Based lighting:
 
 $$
 \begin{align*}
@@ -124,8 +124,7 @@ k_{IBL} = \frac{\alpha^2}{2}
 \end{align*}
 $$
 
-
-Similarly, we will calculate Geometry function for light direction, $G_{SchlickGGX}(n, l, k)$ and then combine it with $G_{SchlickGGX}(n, v, k)$.
+Similarly, we calculate the Geometry function for the light direction, $G_{SchlickGGX}(n, l, k)$ and then combine it with Geometry function for the view direction, $G_{SchlickGGX}(n, v, k)$.
 
 $$
 \begin{align*}

@@ -3,14 +3,14 @@ layout: post
 title:  "Rendering 1 Million spheres: Part 5 (GPU Culling & LOD)"
 date:   2025-06-08
 ---
-In this blog, we will understand and implement a compute shader to calculate the Frustum culling and LOD, which will run in GPU.
+In this blog, we will understand and implement a compute shader to perform frustum culling and LOD calculations on the GPU.
 
-When we are going to transfer our calculation to compute shader, we also need to pass the input data and then send it back to CPU before calling `glDrawElementInstanced()`. 
+When transferring calculations to the compute shader, we also need to pass the input data to the GPU and retrieve it on the CPU before invoking `glDrawElementInstanced()`. 
 
-We will use **Shader Storage Buffer Objects** (SSBOs) for trasferring this input and output data. SSBOs allows shaders to access large amount of data stored in buffer objects and provides a easy way to share large arrays between CPU and GPU.
-We will also need some Atomic Counter Buffer Objects (ACBOs) for keeping LOD selection count. We will reset these ACBOs to 0 before calling `glDispatchCompute` which runs culling and LOD calculations.
+We will use **Shader Storage Buffer Objects** (SSBOs) for transferring this input and output data. SSBOs allows shaders to access large amounts of data stored in buffer objects and provides an easy way to share large arrays between the CPU and GPU.
+We will also need some Atomic Counter Buffer Objects (ACBOs) to track LOD selection count. Before invoking `glDispatchCompute()` to perform culling and LOD calculations, we will reset these ACBOs to zero.
 
-We'll create 2 new classes `SSBO` and `ACBO` similar to `VBO` class but with buffer binding target type of `GL_SHADER_STORAGE_BUFFER` and `GL_ATOMIC_COUNTER_BUFFER` instead of `GL_ARRAY_BUFFER`. We will create one SSBO which will contain all instance positions data and 3 empty SSBOs for LOD to hold memory in the GPU.
+We'll create 2 new classes, `SSBO` and `ACBO` similar to `VBO` class but using buffer binding target types of `GL_SHADER_STORAGE_BUFFER` and `GL_ATOMIC_COUNTER_BUFFER` instead of `GL_ARRAY_BUFFER`. We will create one SSBO which will contain all instance positions data and 3 empty SSBOs, reserved for LOD data, to allocate memory on the GPU.
 ```cpp
 // In SSBO.cpp
 SSBO::SSBO(const std::vector<glm::vec3>& instanceData, std::string bufferType)
@@ -48,8 +48,8 @@ Mesh::Mesh(...){
   ...
 }
 ```
-Now we have initialized our SSBOs and ACBOs, we will define the compute shader with culling and LOD calculation.
-In our ShaderClass, we will add new constructor, which can create a new shader program for compute shaders.
+Now that we have initialized our SSBOs and ACBOs, we will define the compute shader to perform culling and LOD calculations.
+In our ShaderClass, we will add a new constructor, which will create shader program for compute shaders.
 ```cpp
 Shader::Shader(const char* computeShaderFile, const char* shaderType)
 {
@@ -71,7 +71,7 @@ Shader::Shader(const char* computeShaderFile, const char* shaderType)
 	glDeleteShader(computeShader);
 }
 ```
-Then we will create a new compute shader with name `cullingLOD.comp` with following code. I will add the required comments to make it understand but most of it is very easy to understand.
+Next, we will create a new compute shader named `cullingLOD.comp` with following code. I will add the required comments to explain the code, although most of it is straightforward.
 ```GLSL
 #version 430
 
@@ -137,7 +137,7 @@ Shader cullingLODShader("./cullingLOD.comp", "Compute Shader");
 cullingLODShader.Activate();
 ...
 ```
-Now we need to create a new function which should get called inside our rendering loop and that can do pre setup before calling this compute shader.
+Now we need to create a new function that will be called within the rendering loop to handle the necessary setup for compute shader and also to dispatch it.
 ```cpp
 // In Mesh.cpp
 void Mesh::gpuCullingLOD(Shader& computeShader, Camera& camera)
@@ -172,10 +172,13 @@ void Mesh::gpuCullingLOD(Shader& computeShader, Camera& camera)
   glFinish(); // for synchronization and to ensure that compute shader has finished execution before proceeding
 }
 ```
-Now we are set and we have updated data with culling and LOD selection but how to pass it to vertex shader in our rendering pipeline. 
-We can copy it to `highInstancePositions` and other vector arrays but this copying of large amount of data for each frame will cost us too much. Can we do something more optimal?
+At this point, we have updated data with culling and LOD selection. However, we need to determine how to pass this data to the vertex shader in the rendering pipeline.
+One approach is to copy the data to `highInstancePositions` and other vector arrays. However, copying large amounts of data each frame can be computationally expensive. Can we do something more optimal?
 
-As we already have this calculated data stored in GPU, we should use it directly in our vertex shader. It will directly read it from same memory locations, we just have to tell where to read. But we also have to modify our vertex shader code a little. We will add separate SSBOs for instancePositions and others and then read current instancePosition with `gl_InstanceID`.
+Since the calculated data is already stored on the GPU, we should use it directly in the vertex shader. The vertex shader can directly access this data from the same memory locations; we simply need to specify the memory locations to read from. We will also need to modify our vertex shader code accordingly". We will add separate SSBOs for instancePositions and other data, allowing the vertex shader to read the current instance position and other instanced data using `gl_InstanceID`. 
+
+By linking SSBOs to the vertex shader, we eliminate the need for CPU-to-GPU data transfers, allowing the GPU to process instance data directly. This approach significantly improves performance by reducing the overhead associated with copying large data arrays.
+
 ```GLSL
 // In sphere.vert
 ...
@@ -193,7 +196,7 @@ void main(){
   ...
 }
 ```
-Now inside our `Mesh::Draw` function, just fetch all lod counts from Atomic Count Buffers, bind respected SSBOs based on current LOD and call glDrawElementsInstanced() with current LOD count.
+Now inside our `Mesh::Draw` function, simply fetch all LOD counts from the Atomic Count Buffers, bind the corresponding SSBOs based on the current LOD and call glDrawElementsInstanced() using the current LOD count as the parameter.
 ```cpp
 void Mesh::Draw(){
   ...
@@ -216,8 +219,9 @@ void Mesh::Draw(){
   ...
 }
 ```
-And we are done.
 
-**You should get 60fps frame rate for our application with 1 Million spheres.**
+And that’s it!
+
+**You should achieve a frame rate of 60 fps for the application, even with 1 Million spheres.**
 
 I will continue this blog with other titles which will discuss PBR and IBL in detail and its integration in our application.
