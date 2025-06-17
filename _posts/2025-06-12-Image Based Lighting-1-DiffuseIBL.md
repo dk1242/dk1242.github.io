@@ -39,15 +39,17 @@ In the integral for Diffuse IBL, the constant term $k_d\frac{c}{\pi}$ can be fac
 
 To perform convolution on this environment cubemap, we will solve the integral for each output direction $\omega_o$ by sampling multiple incoming directions $\omega_i$. The radiance from these sampled directions is then averaged to compute the convolution result. The hemisphere $\Omega$ used for sampling $\omega_i$ is always aligned with the specific outgoing direction $\omega_o$ being convolved.
 
-This precomputed cubemap represents the sum of all indirect diffuse light from the scene that interacts with the surface aligned along the outgoing direction $\omega_o$. This type of cubemap is commonly reffered to as an irradiance map, as it enables direct sampling of scene's irradiance for any outgoing direction $\omega_o$.
+This precomputed cubemap represents the sum of all indirect diffuse light from the scene that interacts with the surface aligned along the outgoing direction $\omega_o$. This type of cubemap is commonly reffered to as an irradiance map, as it enables direct sampling of scene's irradiance for any outgoing direction $\omega_o$. Think of the irradiance map like a precomputed lighting guide that can tell the shader how much diffuse light is coming from every direction, saving computation time during rendering.
 
 ### Cubemap
-For generating a cubemap, we can either go with a skybox which will have set of 6 images for 6 cube planes or a HDR image. But for implementing PBR, we must have to use HDR images because with normal LDR image skybox, it will have RGB values between 0.0 and 1.0 while HDR have color values outside 0.0 and 1.0 range to give lights with correct intensity.
-I have use below HDR image, you can choose whatever you want from freely available HDR images online.
-![HDR image used](/assets/images/hdrsample.jpeg)
-This image may look a little distorted at some points but its just because this is projected from sphere onto a flat plane. So that we can visualize and store it in a single image known as equirectangular map. 
+We can think of the cubemap as a virtual skybox that surrounds your scene, providing lighting and reflections that mimic a real-world environment.
+To generate a cubemap, we can either use a skybox consisting of six images for the six faces of a cube or an HDR image. However, for PBR implementation, we must have to use HDR images. Unlike normal LDR images, which have RGB values constrained between 0.0 and 1.0, HDR images feature color values outside this range, enabling accurate representation of light intensity too.
+I used the HDR image shown below, but you can choose any freely available HDR images online.
 
-Now we have to convert this into an environment cubemap. We will load it using our old standard library called stb_image.h which supports loading of .hdr images directly as an array of floating point values. We just have to create new constructor in our pre-existing Texture class which we created in [3D basics](https://dk1242.github.io/2025/05/19/Rendering-1M-spheres-2-3D-basics.html#:~:text=one%20more%20function.-,class%20Texture,-%7B%0Apublic%3A) blog. This constructor will support loading of .hdr image.
+![HDR image used](/assets/images/hdrsample.jpeg)
+This image may appear slightly distorted in certain areas because it is projected from a sphere onto a flat plane. This projection allows us to visualize and store the image as a single equirectangular map. 
+
+Now we have to convert this HDR image into an environment cubemap. First, we will load it using the standard `stb_image.h` library, which supports loading .hdr images as arrays of floating-point values. We need to add a new constructor to our existing Texture class, which was introduced in the [3D basics](https://dk1242.github.io/2025/05/19/Rendering-1M-spheres-2-3D-basics.html#:~:text=one%20more%20function.-,class%20Texture,-%7B%0Apublic%3A) blog. This constructor will support loading of .hdr image.
 ```cpp
 Texture::Texture(const char* imagePath, GLenum slot)
 {
@@ -86,9 +88,10 @@ Texture::Texture(const char* imagePath, GLenum slot)
 // In main.cpp
 Texture hdrTexture("./textures/night.hdr", GL_TEXTURE0);
 ```
-After loading this HDR image and creating its Texture object, we need to create its cubemap. To convert an equirectangle image to cubemap, we need to first render a cube and project the equirectangle map on all cube's faces and then take 6 images of this cube's sides as cubemap face.
+Once the HDR image is loaded and its Texture object is created, we need to generate its cubemap. To convert an equirectangular image into a cubemap, we render a cube, project the equirectangular map onto its faces, and capture six images representing the cube's sides as cubemap faces.
 
-We will create a new class TextureUtilities where we can write different functions like GenerateCubemap(), GenrateIrraidanceMap() and others. We will need a common **cube** (skybox) mesh in this class which will be used for generating these maps and a common View Projection Camera matrix.
+We will create a new class **TextureUtilities**, which will contain functions such as GenerateCubemap(), GenerateIrradianceMap(), and others. The TextureUtilities class will have a shared cube (skybox) mesh for generating these maps, as well as a common View-Projection Camera matrix.
+
 ```cpp
 class TextureUtilities {
 public:
@@ -136,7 +139,7 @@ public:
 	GLuint GenerateBRDFLUT(Shader &brdfShader);
 };
 ```
-Inside `TextureUtilities()` constructor, we will assign `skymap` Mesh* with `new Mesh(skyboxVertices, skyboxIndices)` and also initialize the `cameraMatrix`.
+Inside the `TextureUtilities()` constructor, we will initialize the `skymap` pointer with `new Mesh(skyboxVertices, skyboxIndices)` and set up the `cameraMatrix`.
 ```cpp
 TextureUtilities::TextureUtilities()
 {
@@ -158,8 +161,8 @@ TextureUtilities::TextureUtilities()
     skymap = new Mesh(skyboxVertices, skyboxIndices);
 }
 ```
-Before we start writing `GenerateCubeMap()`, we need to create new vertex and fragment shaders which will help in projecting equirectangle map onto each side of cubemap.
-Our vertex shader will not modify anything, it will just pass the local positions to fragment shaders as it is.
+Before we start implementing `GenerateCubeMap()`, we need to create new vertex and fragment shader, which will help in projecting the equirectangular map onto each face of the cubemap.
+The vertex shader will not modify anything, it will simply pass the local positions to the fragment shader without any modifications.
 ```GLSL
 // cubeMapShader.vert
 #version 330 core
@@ -175,7 +178,7 @@ void main()
     gl_Position = camMatrix * vec4(aPos, 1.0);
 }
 ```
-In fragment shader, to project equirectangular map onto the cube faces, we will convert `localPos` 3D vector into spherical UV coordinate system and will use it to sample the texture.
+In the fragment shader, we will project the equirectangular map onto the cube faces by converting the localPos 3D vector into spherical UV coordinates, which will then be used to sample the texture.
 ```GLSL
 #version 330 core
 
@@ -201,14 +204,14 @@ void main() {
     FragColor = vec4(color, 1.0);
 }
 ```
-Now we just have to create a shaderClass object with these 2 shaders and pass it to GenerateCubemap() function.
+Next, we create a ShaderClass object using these two shaders and pass it to GenerateCubemap() function.
 ```cpp
 Shader cubemapShader("./cubemapShader.vert", "./cubemapShader.frag", "cubemap");
 cubemapShader.Activate();
 ...
 GLuint cubemapTexture = textureUtilitiesObject.GenerateCubemap(hdrTexture.ID, cubemapShader);
 ```
-Now we can start writing `GenerateCubemap` function which will genrate a cubemap from provided HDR texture and this shader. We will start with `cubemapTexture` initialization, allocating memory for each cube face, setting some standard texture parameters. Then we will setup the framebuffer and renderbuffer objects and bind the hdr texture and shader. At last, we will render this texture onto each cube map face.
+Now we can start writing `GenerateCubemap` function which will generate a cubemap from provided HDR texture and this shader. The function begins by initializing the `cubemapTexture`, allocating memory for each cube face, and configuring standard texture parameters. Next, we set up the framebuffer and renderbuffer objects, bind the HDR texture, and attach the shader. Finally, we draw the HDR texture onto each cubemap face.
 ```cpp
 GLuint TextureUtilities::GenerateCubemap(GLuint& hdrTexture, Shader &shader)
 {
@@ -224,8 +227,8 @@ GLuint TextureUtilities::GenerateCubemap(GLuint& hdrTexture, Shader &shader)
     ... // other parameters
 
     GLuint captureFBO, captureRBO;
-    glGenFramebuffers(1, &captureFBO);
-    glGenRenderbuffers(1, &captureRBO); // render buffer will store the depth information
+    glGenFramebuffers(1, &captureFBO); // generate 1 frame buffer object (framebuffer = color buffer + depth buffer + stencil buffer)
+    glGenRenderbuffers(1, &captureRBO); // generate 1 reader buffer object (render buffer will store depth info)
 
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
@@ -264,11 +267,11 @@ void Mesh::Draw(Shader& shader) const
     glDrawElements(GL_TRIANGLES, GLsizei(indices.size()), GL_UNSIGNED_INT, 0);
 }
 ```
-It should genearate a cubemap like following:
+It should generate a cubemap like the following image:
 ![Cube map images](/assets/images/cubemap.png)
-I took this screenshot from Nvidia's Nsight Graphics 2025.2.0 Frame debugger window. It's a great tool for debugging, resource utilization info, profiling and other activities.
+I took this screenshot from Nvidia's Nsight Graphics 2025.2.0 Frame debugger window. It's a great tool for debugging, profiling, analyzing resource utilization and other activities.
 
-We can also render this cubemap to form our skymap. For that we will create new shaders. The vertex shader, skymap.vert will just pass the localPos to fragment shader.
+To render the cubemap as a skymap, we need to create new shaders. The vertex shader, skymap.vert, will simply pass the localPos 3D vector to the fragment shader.
 ```GLSL
 #version 330 core
 layout (location = 0) in vec3 aPos;
@@ -284,7 +287,7 @@ void main()
     gl_Position = pos.xyww; // Depth is set far away 
 }
 ```
-The fragment shader will sample the cubemap with localPos and then will apply the standard [gamma correction](https://learnopengl.com/Advanced-Lighting/Gamma-Correction).
+The fragment shader samples the cubemap using localPos and applies standard [gamma correction](https://learnopengl.com/Advanced-Lighting/Gamma-Correction). Gamma correction ensures that the rendered skybox appears visually consistent across different display devices by compensating for non-linear color intensity.
 ```GLSL
 #version 330 core
 in vec3 localPos;
@@ -303,7 +306,7 @@ void main()
     FragColor = vec4(color, 1.0);
 }
 ```
-Now, create a skybox's ShaderClass object and a separate Mesh for rendering.
+Next, we need to create a ShaderClass object for the skybox and a separate Mesh for rendering.
 ```cpp
 // In main.cpp
 //*****************-------SkyMap----------*****************
@@ -333,27 +336,27 @@ while(true){
     ...
 }
 ```
-It should render like a skybox with continous looking environment.
+The result should render as a skybox, creating a continuous-looking environment.
 ![Skybox](/assets/images/skybox.png)
 
-So, we are done with generating a cubemap from a HDR image and its rendering in our application. Now we have to generate the pre discussed Irradiance map.
+With the cubemap generated from the HDR image and rendered in our application, we can now proceed to generate the previously discussed irradiance map.
 
 ### Irradiance Map
-Now we have environmant cubemap and we can sample it for a particular direction $\omega_i$ to calculate the radiance $L(p, \omega_i)$. But now we have to face the real challange of solving the integral for all possible incoming directions.
+Now that we have an environment cubemap, we can sample it for a specific direction $\omega_i$ to calculate radiance $L(p, \omega_i)$. However, we now have to face the challenge of solving the integral for all possible incoming directions.
 
-As we have already discussed, we will precompute and store most of our required calculations in an irradiance map. We can then obtain the radiance value by sampling the irradiance map over the fragment surface oriented around its surface normal.
+As discussed earlier, we will precompute and store the necessary calculations in an irradiance map. The radiance value can then be obtained by sampling the irradiance map for the fragment's surface, oriented along its surface normal.
 ```GLSL
 vec3 irradiance = texture(irradianceMap, N).rgb;
 ```
-As we already know, to generate the irradianceMap, we need to convolute the environment lighting coverted to cubeMap. The surface hemisphere is oriented toward normal, so convoluting the cube map equals calculating the total averaged radiance of each direction $\omega_i$ in  the hemisphere $\Omega$ oriented along $N$.
+To generate the irradiance map, we need to perform convolution on the environment lighting coming from the cubemap. The surface hemisphere is oriented along the normal, and convoluting the cubemap corresponds to calculating the total averaged radiance for each direction $\omega_i$ in the hemisphere $\Omega$ oriented along $N$.
 
-Same as before, we will start with writing vertex and fragment shaders which will support in convolution and genrating the Irradiance Map. For vertex shader, if you want you can use the previous cubeMapShader.vert file or create a new irradianceShader.vert file with the same content.
+As before, we will begin by writing vertex and fragment shaders, to perform convolution and generate the irradiance map. For the vertex shader, you can either reuse the previous cubeMapShader.vert file or create a new `irradianceShader.vert` file containing the same content.
 
-Befor we start writing the fragment shader code we need to understand how we are going to perform covolution. Our solid angle $dw$ will be defined on the basis of the number of segments in the hemisphere $\Omega$. To use it we need to convert it into its equivalent spherical coordinates $sin(\theta) d\theta d\phi$. You can understand this conversion from the [Spheres](https://dk1242.github.io/2025/05/23/Rendering-1M-spheres-3-Spheres.html#:~:text=the%20following%20image.-,Sphere,-Next%20we%20need) section of the [Circle, Sphere and Spheres blog](https://dk1242.github.io/2025/05/23/Rendering-1M-spheres-3-Spheres.html).
+Before writing the fragment shader code, we need to understand how convolution will be performed. The solid angle $dw$ will be defined based on the number of segments in the hemisphere $\Omega$. To utilize the solid angle, we must convert it into its equivalent spherical coordinates, represented as $sin(\theta) d\theta d\phi$. This conversion is explained in the [Spheres](https://dk1242.github.io/2025/05/23/Rendering-1M-spheres-3-Spheres.html#:~:text=the%20following%20image.-,Sphere,-Next%20we%20need) section of the [Circle, Sphere and Spheres blog](https://dk1242.github.io/2025/05/23/Rendering-1M-spheres-3-Spheres.html).
 ![Sphere Vertex](/assets/images//sphereVertex.png)
-We can assume our $d\omega$ have $d\theta$ height and width of $sin(\theta)d\phi$ ($sin(\theta)$ swiped for $d\phi$). The area it will cover will be $sin(\theta)d\phi \times d\theta $ which is equal to the solid angle $d\omega$.
+We can assume that $d\omega$ has a height of $d\theta$ and a width of $sin(\theta)d\phi$ (where $sin(\theta)$ swept over $d\phi$). The area covered will be $sin(\theta)d\phi \times d\theta $, which is equal to the solid angle $d\omega$.
 
-This way we can rewrite our reflectance equation in terms of $\theta$ and $\phi$.
+Using this approach, we can rewrite the reflectance equation in terms of $\theta$ and $\phi$.
 
 $$
 \begin{align*}
@@ -361,7 +364,7 @@ L_o(p, \phi_o, \theta_o) = k_d \frac{c}{\pi} \int_{\phi = 0}^{2\pi}\int_{\theta 
 \end{align*}
 $$
 
-Now we can write our fragment shader with keeping the above method in mind.
+Now we can write the fragment shader, keeping the above method in mind.
 ```GLSL
 #version 330 core
 out vec4 FragColor;
@@ -399,7 +402,7 @@ void main()
     FragColor = vec4(irradiance, 1.0); // Output irradiance
 }
 ```
-Now we'll create another shaderClass object for irradianceShader and will call generateIrradianceMap with this shader and previously generated cubemap texture.
+Next, we create another ShaderClass object for the irradianceShader and call the generateIrradianceMap function with this shader and the previously generated cubemap texture.
 ```cpp
 Shader irradianceShader("./irradianceShader.vert", "./irradianceShader.frag", "irradiancemap");
 irradianceShader.Activate();
@@ -407,7 +410,7 @@ irradianceShader.Activate();
 GLuint irradianceMap = textureUtilitiesObject.GenerateIrradianceMap(cubemapTexture, irradianceShader);
 glViewport(0, 0, WIDTH, HEIGHT);
 ```
-We will implment the `GenerateIrradianceMap()` in very same way as `GenerateCubeMap()` just with some differences which I'll highlight in the code comments.
+We will implement the `GenerateIrradianceMap()` in a similar manner to `GenerateCubeMap()` just with a few differences which I'll highlight in the code comments.
 ```cpp
 GLuint TextureUtilities::GenerateIrradianceMap(GLuint& cubemapTexture, Shader& irradianceShader)
 {
@@ -459,13 +462,13 @@ GLuint TextureUtilities::GenerateIrradianceMap(GLuint& cubemapTexture, Shader& i
     return irradianceMap;
 }
 ```
-It should generate the irradiance map like following:
+It should generate an irradiance map similar to the one shown below.
 ![Irradiance Map](/assets/images/irradianceMap.png)
 
 ## PBR and diffuse IBL
-Before we start for specular part of IBL, we should complete the integration of diffuse IBL with PBR in our pre existing shader code. As both of specular and diffuse IBL are part of indirect lighting, we can replace ambient lighting with this.
+Before starting the specular part of IBL, we should complete the integration of diffuse IBL with PBR in the pre-existing shader code. Since both specular and diffuse IBL are components of indirect lighting, we can replace ambient lighting with them.
 
-We will start by passing our pre-generated irradiance map using `uniform` and then retrieve the irradiance values stored, by sampling it with as a texture around the surface normal. Then we'll use the Fresnel equation to weigh down the diffuse part of IBL. But here we don't have the halfway vector as we are considering all lights coming from all possible directions around the hemisphere. But we can fix this by using `ROUGHNESS` term as halfway vector was used to signify the roughness. And in last we will add in our final color.
+We begin by passing the pre-generated irradiance map as a `uniform`, and then retrieve the stored irradiance values by sampling the texture (irradiance map) around the surface normal. Next, we use the Fresnel equation to adjust the weight of the diffuse part of IBL. However, in this case, we do not have a halfway vector since we are considering light contributions from all possible directions around the hemisphere. This can be addressed by using the ROUGHNESS term, as the halfway vector was previously used to represent roughness. Finally, we add the computed diffuse IBL to the final color.
 ```GLSL
 ...
 uniform samplerCube irradianceMap; // Diffuse irradiance
@@ -495,11 +498,11 @@ void main(){
     FragColor = vec4(color, 1.0);
 }
 ```
-It should give output look like the following image:
+It should give output like the following image:
 ![Spheres with irradiance map](/assets/images/irradianceSpheres.png)
-I have disabled the direct lighting for this output. So we can undertand it better.
+In this output, I have disabled the direct lighting to better illustrate the diffuse IBL.
 
-Now we are left with the specular part of IBL, which I will complete in the next blog because this one has already crossed a good length.
+Now we are left with the specular part of IBL, which I will complete in the next blog as this one has already crossed a good length.
 
 <script>
 window.MathJax = {
