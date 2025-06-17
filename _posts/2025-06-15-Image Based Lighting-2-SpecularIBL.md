@@ -3,7 +3,7 @@ layout: post
 title:  "Image Based Lighting: Part 2 (Specular IBL)"
 date:   2025-06-15
 ---
-As we are done with the diffuse irradiance part of IBL, we will start working on the specular part of the reflectance equation which is following.
+As we have completed the diffuse irradiance component of IBL, we will move on to the specular part of the reflectance equation, as shown below.
 
 $$
 \begin{align*}
@@ -11,9 +11,9 @@ L_o(p, \omega_o) = \int_{\Omega} \left( k_s \frac{DFG}{4(\omega_o \cdot n)(\omeg
 \end{align*}
 $$
 
-Here if we observe, we will find that the Cook-Torrance part is not constant over the integral as compared with diffuse part. It depends on the incoming light direction and on the incoming view direction too. To solve the integral for both variables will be too expensive and even precomputing for both will not be practical in real-time setting. We can follow a standard approach of splitting it into 2 parts which we can convolute separately.
+Here if we observe, we will find that the Cook-Torrance component of the reflectance equation is not constant over the integral, unlike the diffuse component. It depends on both the incoming light direction and the view direction. Solving this integral for both variables is computationally expensive and even precomputing for both will not be practical in real-time setting. A standard approach is to split the specular integral into two parts, which can be convoluted separately.
 
-If we rewrite the specular part of reflectance equations like following:
+If we rewrite the specular component of the reflectance equation as follows:
 
 $$
 \begin{align*}
@@ -29,18 +29,19 @@ L_o(p, \omega_o) =  \int_{\Omega}L_i(p, \omega_i)\, d\omega_i * \int_{\Omega}f_r
 \end{align*}
 $$
 
-After convolution, the first part will be known as pre-filtered environment map and the second part will be BRDF integration map. 
+After convolution, the first integral becomes the pre-filtered environment map, and the second becomes the BRDF integration map. 
 
 ## Pre filtered environment map
-Prefiltering an environment map is similar to how we convoluted the irradiance map in diffuse IBL, just that we will consider roughness too here. With each increasing roughness levels, we will convolute it with more scattered vectors which will result in more blurrier reflections. Each roughness level result will be stored in the mip map levels of pre filtered environment map.
+Prefiltering an environment map is similar to the convolution process for the irradiance map in diffuse IBL, except that we account for roughness here. With each increasing roughness levels, we will convolute it with more scattered vectors which will result in more blurrier reflections. Each roughness level result will be stored in the mipmap levels of prefiltered environment map.
 
-In irradiance convolution, we generated these sample vectors which were uniformly distribute over the hemisphere using their sperical coordinates. But for specular reflection when we considers roughness too, the outgoing vectors will not be very direct or in a cetain angle. The general shape of outgoing light reflections is known as the **specular lobe**. The lobe size will depend on the roughness. We can assume that this lobe will define the reflection orientation about the halfway vectors given some incoming direction. It will make sense to generate the sample vector part of this specular lobe because other outgoing rays will not contribute much. This process is known as **importance smapling**. We could have implemented this for diffuse irradiance calculation too like picking those sample vectors which contributes more to the scene's radiance.
+In irradiance convolution, sample vectors were generated uniformly over the hemisphere using spherical coordinates. For specular reflection, when roughness is considered, outgoing vectors are more scattered and do not follow a specific direction or angle. The general shape of outgoing light reflections is known as the **specular lobe**. The size of the specular lobe depends on the roughness. We can assume that this lobe will define the reflection orientation around the halfway vector for a given incoming light direction. With this, it's better to generate the sample vectors which are part of this specular lobe because other outgoing rays will not contribute much. This process is known as **importance sampling**. We could have implemented this approach for diffuse irradiance calculation as well, by selecting the sample vectors which contributes significantly to the scene's radiance.
 
-Here for specular IBL, to perform importance sampling, we will use Monte Carlo Integration method, which will help in computing the integral value with a limited number of sample vectors. It will almost be same as if we did that integration with all possible sample vectors (which are almost infinite). 
+For specular IBL, importance sampling will be performed using the Monte Carlo Integration method, which will help in computing the integral value with a limited number of sample vectors. This approach approximates the result of integrating over all possible sample vectors, which would otherwise be computationally infeasible. We can think of importance sampling as prioritizing key contributors for an output, ensuring the end result is achieved efficiently without wasting effort on less impactful elements.
 
-> We can understand this with a Normal Distributed function too. In other parts of life too, most of the things are normally distributed. A lot of things are average. The frequency of averages will always be higher. The extremes are rare. So, instead of considering everyone, just consider averages and you can reach a considerable solution.
+> This concept can be understood through a Normal Distribution, which is commonly observed in various aspects of life. In other parts of life too, most of the things are normally distributed. A lot of things are average, the frequency of averages will always be higher, the extremes are rare. Thus, by focusing on averages rather than extremes, a practical and efficient solution can be achieved.
 
-We will follow the same steps we did in irradiance map calculation. We will start a loop over sampleCount and follow the standard method of generating a pseudo-random 2D vector `Xi` which will be used in Importance sampling to sample directions for reflection vectors based on surface roughness. This may not be evenly distributed but can give almost similar visual results. Then we will calculate the mip level based on the input roughness and the GGX distribution. It will ensure that rough surfaces will sample lower resolution mipmap levels, simulating the blurring effect for rough reflections. Then prefilter the envMap based on the miplevel and store it in the `prefilteredColor` result. In last, divide it by totalWeight to ensure the smaller NdotL will contribute less to the final result and vice versa. If we don't do it, it will result in overly bright or dark reflections.
+We will follow the same steps we did in irradiance map calculation. We will start a loop over sampleCount and follow the standard method of generating a pseudo-random 2D vector `Xi` which will be used in Importance sampling to sample directions for reflection vectors based on surface roughness. While this may not produce evenly distributed sample vectors, it can yield visually similar results. Next, the mip level is calculated based on the input roughness and the GGX Distribution. It will ensure that rough surfaces will sample lower resolution mipmap levels, simulating the blurring effect for rough reflections. The environment map is then prefiltered based on the calculated mip level and stored in the `prefilteredColor` result. Finally, the result is divided by totalWeight to ensure that smaller $N\cdotL$ values contribute less to the final result, while larger values contribute more. 
+If we don't do it, it can result in overly bright or dark reflections.
 ```GLSL
 #version 430 core
 
@@ -120,7 +121,7 @@ void main() {
     FragColor = vec4(prefilteredColor, 1.0); // Output prefiltered color
 }
 ```
-Now, we can start writing our GeneratePrefilteredCubemap function, which will be similar to GenerateIrradianceMap just with the difference that it will generate this map for multiple mipmap levels. I will directly paste the entire function here and mention the differenced in code comments.
+Now, we can start writing the GeneratePrefilteredCubemap function, which is similar to GenerateIrradianceMap, but generates the map for multiple mipmap levels. I will paste the entire function below and highlight the differences in the code comments.
 ```cpp
 GLuint TextureUtilities::GeneratePrefilteredCubemap(GLuint& cubemapTexture, Shader& prefilterShader, GLuint maxMipLevels)
 {
@@ -181,14 +182,14 @@ GLuint TextureUtilities::GeneratePrefilteredCubemap(GLuint& cubemapTexture, Shad
     return prefilteredCubemap;
 }
 ```
-It will produce output like following. I have not yet explained how we will integarte it with our main fragment shader but as I have already written that part, I'm showing this output.
+It Should produce output similar to the following. I have not yet explained how this will be integrated into the main fragment shader, but since I have already written that part, I'm showing this output.
 
 ![Prefilter Map output](/assets/images/prefilterOutput.png)
 
 ## BRDF Integration map
-Now we need to calculate the second integral $\int_{\Omega}f_r(p, \omega_i, \omega_o)(\mathbf{n} \cdot \omega_i) \, d\omega_i$. It requires us to convolute the BRDF equation over the angle $\mathbf{n}.\omega_o$, the surface roughness and fresnel's $F_0$. 
+Next, we calculate the second integral $\int_{\Omega}f_r(p, \omega_i, \omega_o)(\mathbf{n} \cdot \omega_i) \, d\omega_i$. It requires convoluting the BRDF equation over the angle $\mathbf{n}.\omega_o$, the surface roughness and Fresnel's $F_0$. 
 
-Convoluting over 3 variables is too much, we will try to take out the $F_0$ from the equation:
+Convoluting over three variables is computationally intensive, so we will simplify the equation by extracting $F_0$ from it.
 
 $$
 \begin{align*}
@@ -205,7 +206,7 @@ $$
 \end{align*}
 $$
 
-Next we split this integral into two parts:
+Next, split this integral into two parts:
 
 $$
 \begin{align*}
@@ -213,11 +214,11 @@ F_0\int_{\Omega} \frac{f_r(p, \omega_i, \omega_o)}{F(\omega_o, h)} (1- (1-w_o.h)
 \end{align*}
 $$
 
-This way, $F_0$ is constant over the integral and that how we took it out of integration. If you remember the term $f_r(p, \omega_i, \omega_o)$ also contains $F$, so, it will get cancelled out in the equation.
+This way, $F_0$ becomes constant over the integral, allowing us to remove it from the integration. If you remember the term $f_r(p, \omega_i, \omega_o)$ also contains $F$, so, it will get cancelled out in the equation.
 
-Now, we will convolute it in same way we did for other convoluted environment maps. Just the difference will be instead of using a cubemap, we will use a 2D lookup texture known as BRDF integration map, to store the convoluted result. This map will be used to get the final specular IBL result.
+Now, we will convolute it in same way we did for other convoluted environment maps. The key difference is that, instead of using a cubemap, we will use a 2D lookup texture called the BRDF integration map to store the convoluted result. This map will be used to calculate the final specular IBL result.
 
-In the vertex shader we will pass the texCoords along with the local position. The fragment shader code will be very similar to prefilterShader but it will process the sample vectors according to our Geometry function and Fresnel-Schlick's approximation.
+In the vertex shader, we pass the texture coordinates (texCoords) along with the local position. The fragment shader code is similar to prefilterShader, but processes the sample vectors based on the Geometry function and Fresnel-Schlick approximation.
 ```GLSL
 ...
 float GeometrySchlickGGX(float NdotV, float roughness) {
@@ -279,7 +280,7 @@ void main()
     FragColor = integratedBRDF;
 }
 ```
-Now, we will generate BRDF 2d Lookup texture of dimensions 512 x 512.
+Now, we will generate a BRDF 2d Lookup texture with dimensions 512 x 512.
 ```cpp
 void RenderQuad() {
     static GLuint quadVAO=0, quadVBO;
@@ -346,7 +347,7 @@ GLuint TextureUtilities::GenerateBRDFLUT(Shader& brdfShader)
     return brdfLUTTexture;
 }
 ```
-It should produce a new texture like this.
+It should produce a new texture like following image.
 
 <!-- ![](/assets/images/brdf.png) -->
 <div style="text-align: center;">
@@ -355,7 +356,7 @@ It should produce a new texture like this.
 <br/>
 
 ## Completing the specular IBL part of PBR shader
-We will pass both prefilteredEnvMap and brdfLUT map to the shader with uniforms. To get the specular reflections of the surface, we will sample the prefilteredEnvMap using the reflection vector based on the surface roughness and mip level, giving rough surface a blurrier reflection. Then we will sample the BRDF LUT with roughness and the angle between N and V.
+Both the prefilteredEnvMap and the brdfLUT map are passed to the shader as uniforms. To compute the specular reflections of the surface, we will sample the prefilteredEnvMap using the reflection vector based on the surface roughness and mip level, giving rough surface a blurrier reflection. Next, the BRDF LUT is sampled using the roughness and the angle between N (surface normal) and V (view direction).
 ```GLSL
 ...
 // SPECULAR IBL
@@ -375,15 +376,24 @@ color = pow(color, vec3(1.0/2.2));
 
 FragColor = vec4(color, 1.0);
 ```
-This is producing an output like this which fully implements and visulaizes **Physically Based Rendering (PBR) with direct lighting and Image Based Lighting (IBL)**.
+This produces the output shown below, fully implementing and visualizing **Physically Based Rendering (PBR) with direct lighting and Image Based Lighting (IBL)**.
 
 ![PBR And IBL final Output](/assets/images/finalOutput.png)
 
-If we add the input Albedo color too, it will look like this.
+When the input Albedo color is also added, the output appears as shown below.
 
 ![PBR & IBL with input Albedo](/assets/images/finalOutputWithColor.png)
 
-Here, we are done with our target of rendering **1 Million spheres with dynamic lighting and Physically Based Rendering while maintaing 60fps on the screen**.
+## Final stats (per frame)
+* Number of Draw calls: 4 (3 for sphere LODs, 1 for skybox)
+* Total number of vertices: around 217 Million
+* Compute shader time (in GPU): 0.25ms
+* High detailed spheres draw time: 2.99ms
+* Medium detailed spheres draw time: 8.04ms
+* Low detailed spheres draw time: 2.12ms
+
+
+With this, we have achieved our goal of rendering **1 Million spheres with dynamic lighting and Physically Based Rendering while maintaing 60fps on the screen**.
 
 <script>
 window.MathJax = {
