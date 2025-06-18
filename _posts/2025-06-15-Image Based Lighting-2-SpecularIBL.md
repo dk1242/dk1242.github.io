@@ -382,6 +382,7 @@ This produces the output shown below, fully implementing and visualizing **Physi
 
 When the input Albedo color is also added, the output appears as shown below.
 
+<a id="final-output"></a>
 ![PBR & IBL with input Albedo](/assets/images/finalOutputWithColor.png)
 
 ## Final stats (per frame)
